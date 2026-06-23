@@ -1,266 +1,131 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Motion Runner AI Stable Final</title>
+<meta charset="UTF-8" />
+<title>AI Motion Runner Dashboard</title>
 
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-      overflow: hidden;
-      background: black;
-      font-family: Arial;
-      color: white;
-    }
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    background: #0f0f0f;
+    font-family: Arial;
+  }
 
-    /* GAME */
-    #gameArea {
-      width: 65%;
-      height: 100vh;
-      position: relative;
-      background: #111;
-    }
+  #gameContainer {
+    width: 65%;
+    height: 100vh;
+    background: #111;
+  }
 
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
+  #cameraContainer {
+    width: 35%;
+    height: 100vh;
+    position: relative;
+    background: #000;
+  }
 
-    /* CAMERA */
-    #camArea {
-      width: 35%;
-      height: 100vh;
-      position: relative;
-      border-left: 2px solid #222;
-      background: black;
-    }
+  canvas {
+    display: block;
+  }
 
-    video {
-      display: none;
-    }
+  #video {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1);
+    object-fit: cover;
+  }
 
-    #camCanvas {
-      width: 100%;
-      height: 100%;
-    }
+  #overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
 
-    #ui {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.6);
-      padding: 8px;
-      border-radius: 8px;
-      font-size: 13px;
-      z-index: 10;
-    }
-  </style>
+  #stateBox {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: white;
+    font-size: 20px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px;
+  }
+</style>
+
 </head>
-
 <body>
 
-<!-- GAME -->
-<div id="gameArea">
-  <div id="ui">STATE: IDLE</div>
-  <canvas id="game"></canvas>
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
 </div>
 
-<!-- CAMERA -->
-<div id="camArea">
-  <video id="video" autoplay playsinline></video>
-  <canvas id="camCanvas"></canvas>
+<div id="cameraContainer">
+  <video id="video" autoplay></video>
+  <canvas id="overlay"></canvas>
+  <div id="stateBox">STATE: IDLE</div>
 </div>
 
+<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 <script>
-
-//////////////////////////////
+// ==========================
 // GAME SETUP
-//////////////////////////////
-const g = document.getElementById("game");
-const gctx = g.getContext("2d");
+// ==========================
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-g.width = window.innerWidth * 0.65;
-g.height = window.innerHeight;
+canvas.width = window.innerWidth * 0.65;
+canvas.height = window.innerHeight;
 
 let player = {
   lane: 1,
-  y: g.height - 140,
-  jumping: false
+  x: canvas.width / 2,
+  y: canvas.height - 120,
+  targetX: canvas.width / 2,
+  jumping: false,
+  jumpY: 0
 };
 
 const lanes = [
-  g.width / 3,
-  g.width / 2,
-  g.width * 2 / 3
+  canvas.width * 0.3,
+  canvas.width * 0.5,
+  canvas.width * 0.7
 ];
 
-function drawGame(){
-  gctx.clearRect(0,0,g.width,g.height);
-
-  gctx.strokeStyle = "#444";
-  gctx.beginPath();
-  gctx.moveTo(0, g.height - 100);
-  gctx.lineTo(g.width, g.height - 100);
-  gctx.stroke();
-
-  gctx.fillStyle = "lime";
-  gctx.beginPath();
-  gctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI*2);
-  gctx.fill();
-
-  requestAnimationFrame(drawGame);
-}
-drawGame();
-
-//////////////////////////////
-// CAMERA SETUP
-//////////////////////////////
-const video = document.getElementById("video");
-const camCanvas = document.getElementById("camCanvas");
-const cctx = camCanvas.getContext("2d");
-
-camCanvas.width = window.innerWidth * 0.35;
-camCanvas.height = window.innerHeight;
-
-function drawCam(){
-  cctx.save();
-  cctx.translate(camCanvas.width,0);
-  cctx.scale(-1,1);
-  cctx.drawImage(video,0,0,camCanvas.width,camCanvas.height);
-  cctx.restore();
-}
-
-function drawPoints(lm){
-  cctx.fillStyle = "red";
-  [11,12,0].forEach(i=>{
-    const p = lm[i];
-    cctx.beginPath();
-    cctx.arc(p.x*camCanvas.width,p.y*camCanvas.height,6,0,Math.PI*2);
-    cctx.fill();
-  });
-}
-
-//////////////////////////////
-// STABLE AI SYSTEM
-//////////////////////////////
-
-let state = "IDLE";
-let lastTrack = 0;
-
-// smoothing
-let smoothDiff = 0;
-const ALPHA = 0.25;
-
-// history filter
+// ==========================
+// STATE MACHINE
+// ==========================
+let currentState = "IDLE";
 let history = [];
-const HISTORY_SIZE = 5;
 
-// single person lock
+// ==========================
+// SMOOTHING
+// ==========================
+let ema = { left: 0, right: 0, nose: 0 };
+const alpha = 0.2;
+
+// ==========================
+// SINGLE PERSON LOCK
+// ==========================
 let locked = false;
-let baseX = 0;
-let baseY = 0;
+let baseNose = null;
 
-function setState(s){
-  if(state === s) return;
+// ==========================
+// CAMERA
+// ==========================
+const videoElement = document.getElementById("video");
 
-  state = s;
-  document.getElementById("ui").innerText = "STATE: " + state;
-
-  setTimeout(()=>{
-    state = "IDLE";
-    document.getElementById("ui").innerText = "STATE: IDLE";
-  },300);
-}
-
-function classify(diff, noseY){
-  const DEADZONE = 0.07;
-
-  if(noseY < 0.35) return "JUMP";
-
-  if(diff > DEADZONE) return "LEFT";
-  if(diff < -DEADZONE) return "RIGHT";
-
-  return "IDLE";
-}
-
-//////////////////////////////
-// MAIN TRACKING
-//////////////////////////////
-function onResults(res){
-  if(!res.poseLandmarks) return;
-
-  const now = Date.now();
-  if(now - lastTrack < 200) return;
-  lastTrack = now;
-
-  const lm = res.poseLandmarks;
-
-  const nose = lm[0];
-  const left = lm[11];
-  const right = lm[12];
-
-  // LOCK SINGLE PERSON
-  if(!locked){
-    baseX = nose.x;
-    baseY = nose.y;
-    locked = true;
-  }
-
-  // ignore others
-  const dx = Math.abs(nose.x - baseX);
-  const dy = Math.abs(nose.y - baseY);
-  if(dx > 0.25 || dy > 0.25) return;
-
-  drawCam();
-  drawPoints(lm);
-
-  // MIRROR SAFE
-  let rawDiff = left.x - right.x;
-
-  // SMOOTH
-  smoothDiff = smoothDiff * (1 - ALPHA) + rawDiff * ALPHA;
-
-  const newState = classify(smoothDiff, nose.y);
-
-  // HISTORY FILTER
-  history.push(newState);
-  if(history.length > HISTORY_SIZE) history.shift();
-
-  let counts = {LEFT:0, RIGHT:0, IDLE:0, JUMP:0};
-
-  history.forEach(s => counts[s]++);
-
-  let finalState = Object.keys(counts).reduce((a,b)=>
-    counts[a] > counts[b] ? a : b
-  );
-
-  setState(finalState);
-
-  // GAME CONTROL
-  if(finalState === "LEFT") player.lane = 0;
-  if(finalState === "RIGHT") player.lane = 2;
-  if(finalState === "IDLE") player.lane = 1;
-
-  if(finalState === "JUMP" && !player.jumping){
-    player.jumping = true;
-    player.y -= 120;
-
-    setTimeout(()=>{
-      player.y = g.height - 140;
-      player.jumping = false;
-    },450);
-  }
-}
-
-//////////////////////////////
-// MEDIA PIPE
-//////////////////////////////
-const pose = new Pose({
-  locateFile: file =>
+// ==========================
+// MEDIAPIPE POSE
+// ==========================
+const pose = new Pose.Pose({
+  locateFile: (file) =>
     `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
 });
 
@@ -273,16 +138,173 @@ pose.setOptions({
 
 pose.onResults(onResults);
 
-const camera = new Camera(video,{
-  onFrame: async ()=>{
-    await pose.send({image:video});
+// ==========================
+// CAMERA START
+// ==========================
+const camera = new Camera.Camera(videoElement, {
+  onFrame: async () => {
+    await pose.send({ image: videoElement });
   },
-  width:640,
-  height:480
+  width: 640,
+  height: 480
 });
 
 camera.start();
 
+// ==========================
+// RESULTS PROCESSING
+// ==========================
+function onResults(results) {
+  const canvasOverlay = document.getElementById("overlay");
+  canvasOverlay.width = videoElement.videoWidth;
+  canvasOverlay.height = videoElement.videoHeight;
+
+  const ctx2 = canvasOverlay.getContext("2d");
+  ctx2.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+
+  if (!results.poseLandmarks) return;
+
+  const lm = results.poseLandmarks;
+
+  const nose = lm[0];
+  const leftShoulder = lm[11];
+  const rightShoulder = lm[12];
+
+  // ==========================
+  // SINGLE PERSON LOCK
+  // ==========================
+  if (!locked) {
+    baseNose = nose.x;
+    locked = true;
+  }
+
+  const noseOffset = nose.x - baseNose;
+
+  // ==========================
+  // EMA SMOOTHING
+  // ==========================
+  ema.left = alpha * leftShoulder.x + (1 - alpha) * ema.left;
+  ema.right = alpha * rightShoulder.x + (1 - alpha) * ema.right;
+  ema.nose = alpha * noseOffset + (1 - alpha) * ema.nose;
+
+  const shoulderDiff = ema.right - ema.left;
+  const offset = ema.nose;
+
+  // ==========================
+  // CLASSIFICATION
+  // ==========================
+  let state = "IDLE";
+
+  const DEADZONE = 0.07;
+
+  if (Math.abs(offset) < DEADZONE) {
+    state = "IDLE";
+  } else if (offset < -DEADZONE) {
+    state = "LEFT";
+  } else if (offset > DEADZONE) {
+    state = "RIGHT";
+  }
+
+  // SIMPLE JUMP (both shoulders high heuristic)
+  if (Math.abs(leftShoulder.y - rightShoulder.y) < 0.02) {
+    state = "JUMP";
+  }
+
+  // ==========================
+  // HISTORY VOTING
+  // ==========================
+  history.push(state);
+  if (history.length > 5) history.shift();
+
+  const finalState = mode(history);
+
+  currentState = finalState;
+  document.getElementById("stateBox").innerText = "STATE: " + currentState;
+
+  // ==========================
+  // DRAW SKELETON
+  // ==========================
+  drawPoint(ctx2, nose);
+  drawPoint(ctx2, leftShoulder);
+  drawPoint(ctx2, rightShoulder);
+}
+
+function drawPoint(ctx, p) {
+  ctx.fillStyle = "red";
+  ctx.beginPath();
+  ctx.arc(p.x * 640, p.y * 480, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ==========================
+// MODE (MAJORITY VOTE)
+// ==========================
+function mode(arr) {
+  const freq = {};
+  let max = 0;
+  let res = "IDLE";
+
+  for (let v of arr) {
+    freq[v] = (freq[v] || 0) + 1;
+    if (freq[v] > max) {
+      max = freq[v];
+      res = v;
+    }
+  }
+  return res;
+}
+
+// ==========================
+// GAME LOOP
+// ==========================
+function updateGame() {
+  // lane control
+  if (currentState === "LEFT") player.lane = 0;
+  if (currentState === "RIGHT") player.lane = 2;
+  if (currentState === "IDLE") player.lane = 1;
+
+  // jump
+  if (currentState === "JUMP" && !player.jumping) {
+    player.jumping = true;
+    player.jumpY = 80;
+    setTimeout(() => {
+      player.jumping = false;
+      player.jumpY = 0;
+    }, 500);
+  }
+
+  player.targetX = lanes[player.lane];
+
+  // smooth movement
+  player.x += (player.targetX - player.x) * 0.15;
+}
+
+function drawGame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // lanes
+  ctx.strokeStyle = "#333";
+  for (let i = 1; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(canvas.width * (i / 3), 0);
+    ctx.lineTo(canvas.width * (i / 3), canvas.height);
+    ctx.stroke();
+  }
+
+  // player
+  ctx.fillStyle = "cyan";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y - player.jumpY, 30, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function loop() {
+  updateGame();
+  drawGame();
+  requestAnimationFrame(loop);
+}
+
+loop();
 </script>
 
 </body>
