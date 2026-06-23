@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motion Runner AI - Single Person Stable</title>
+  <title>Motion Runner AI Stable Final</title>
 
   <style>
     body {
@@ -60,19 +60,18 @@
 
 <body>
 
-<!-- ================= GAME ================= -->
+<!-- GAME -->
 <div id="gameArea">
-  <div id="ui">STATE: IDLE | SINGLE USER LOCK</div>
+  <div id="ui">STATE: IDLE</div>
   <canvas id="game"></canvas>
 </div>
 
-<!-- ================= CAMERA ================= -->
+<!-- CAMERA -->
 <div id="camArea">
   <video id="video" autoplay playsinline></video>
   <canvas id="camCanvas"></canvas>
 </div>
 
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
@@ -102,14 +101,12 @@ const lanes = [
 function drawGame(){
   gctx.clearRect(0,0,g.width,g.height);
 
-  // ground
   gctx.strokeStyle = "#444";
   gctx.beginPath();
   gctx.moveTo(0, g.height - 100);
   gctx.lineTo(g.width, g.height - 100);
   gctx.stroke();
 
-  // player
   gctx.fillStyle = "lime";
   gctx.beginPath();
   gctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI*2);
@@ -117,31 +114,10 @@ function drawGame(){
 
   requestAnimationFrame(drawGame);
 }
-
 drawGame();
 
 //////////////////////////////
-// STATE MACHINE
-//////////////////////////////
-let state = "IDLE";
-let lastTrack = 0;
-
-function setState(s){
-  if(state === s) return;
-
-  state = s;
-  document.getElementById("ui").innerText =
-    "STATE: " + state + " | SINGLE USER LOCK";
-
-  setTimeout(()=>{
-    state = "IDLE";
-    document.getElementById("ui").innerText =
-      "STATE: IDLE | SINGLE USER LOCK";
-  }, 300);
-}
-
-//////////////////////////////
-// CAMERA
+// CAMERA SETUP
 //////////////////////////////
 const video = document.getElementById("video");
 const camCanvas = document.getElementById("camCanvas");
@@ -169,14 +145,50 @@ function drawPoints(lm){
 }
 
 //////////////////////////////
-// SINGLE PERSON LOCK
+// STABLE AI SYSTEM
 //////////////////////////////
+
+let state = "IDLE";
+let lastTrack = 0;
+
+// smoothing
+let smoothDiff = 0;
+const ALPHA = 0.25;
+
+// history filter
+let history = [];
+const HISTORY_SIZE = 5;
+
+// single person lock
 let locked = false;
 let baseX = 0;
 let baseY = 0;
 
+function setState(s){
+  if(state === s) return;
+
+  state = s;
+  document.getElementById("ui").innerText = "STATE: " + state;
+
+  setTimeout(()=>{
+    state = "IDLE";
+    document.getElementById("ui").innerText = "STATE: IDLE";
+  },300);
+}
+
+function classify(diff, noseY){
+  const DEADZONE = 0.07;
+
+  if(noseY < 0.35) return "JUMP";
+
+  if(diff > DEADZONE) return "LEFT";
+  if(diff < -DEADZONE) return "RIGHT";
+
+  return "IDLE";
+}
+
 //////////////////////////////
-// TRACKING
+// MAIN TRACKING
 //////////////////////////////
 function onResults(res){
   if(!res.poseLandmarks) return;
@@ -186,55 +198,54 @@ function onResults(res){
   lastTrack = now;
 
   const lm = res.poseLandmarks;
-  const nose = lm[0];
 
-  // =========================
-  // LOCK 1 PERSON
-  // =========================
+  const nose = lm[0];
+  const left = lm[11];
+  const right = lm[12];
+
+  // LOCK SINGLE PERSON
   if(!locked){
     baseX = nose.x;
     baseY = nose.y;
     locked = true;
   }
 
+  // ignore others
   const dx = Math.abs(nose.x - baseX);
   const dy = Math.abs(nose.y - baseY);
-
-  // ignore other people
   if(dx > 0.25 || dy > 0.25) return;
 
   drawCam();
   drawPoints(lm);
 
-  const left = lm[11];
-  const right = lm[12];
+  // MIRROR SAFE
+  let rawDiff = left.x - right.x;
 
-  const diff = left.x - right.x;
-  const DEADZONE = 0.06;
+  // SMOOTH
+  smoothDiff = smoothDiff * (1 - ALPHA) + rawDiff * ALPHA;
 
-  let newState = "IDLE";
+  const newState = classify(smoothDiff, nose.y);
 
-  // priority: jump > move
-  if(nose.y < 0.35){
-    newState = "JUMP";
-  }
-  else if(diff > DEADZONE){
-    newState = "LEFT";
-  }
-  else if(diff < -DEADZONE){
-    newState = "RIGHT";
-  }
+  // HISTORY FILTER
+  history.push(newState);
+  if(history.length > HISTORY_SIZE) history.shift();
 
-  setState(newState);
+  let counts = {LEFT:0, RIGHT:0, IDLE:0, JUMP:0};
 
-  // =========================
-  // GAME ACTIONS
-  // =========================
-  if(newState === "LEFT") player.lane = 0;
-  if(newState === "RIGHT") player.lane = 2;
-  if(newState === "IDLE") player.lane = 1;
+  history.forEach(s => counts[s]++);
 
-  if(newState === "JUMP" && !player.jumping){
+  let finalState = Object.keys(counts).reduce((a,b)=>
+    counts[a] > counts[b] ? a : b
+  );
+
+  setState(finalState);
+
+  // GAME CONTROL
+  if(finalState === "LEFT") player.lane = 0;
+  if(finalState === "RIGHT") player.lane = 2;
+  if(finalState === "IDLE") player.lane = 1;
+
+  if(finalState === "JUMP" && !player.jumping){
     player.jumping = true;
     player.y -= 120;
 
@@ -246,7 +257,7 @@ function onResults(res){
 }
 
 //////////////////////////////
-// MEDIA PIPE INIT
+// MEDIA PIPE
 //////////////////////////////
 const pose = new Pose({
   locateFile: file =>
