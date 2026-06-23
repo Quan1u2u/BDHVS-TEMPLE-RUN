@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Motion Runner Stable</title>
+  <title>Motion Runner AI - Single Person Stable</title>
 
   <style>
     body {
       margin: 0;
       display: flex;
       overflow: hidden;
-      font-family: Arial;
       background: black;
+      font-family: Arial;
       color: white;
     }
 
@@ -53,6 +53,7 @@
       padding: 8px;
       border-radius: 8px;
       font-size: 13px;
+      z-index: 10;
     }
   </style>
 </head>
@@ -61,7 +62,7 @@
 
 <!-- ================= GAME ================= -->
 <div id="gameArea">
-  <div id="ui">STATE: IDLE</div>
+  <div id="ui">STATE: IDLE | SINGLE USER LOCK</div>
   <canvas id="game"></canvas>
 </div>
 
@@ -123,19 +124,20 @@ drawGame();
 // STATE MACHINE
 //////////////////////////////
 let state = "IDLE";
-let lastUpdate = 0;
+let lastTrack = 0;
 
-function setState(newState){
-  if(state === newState) return;
+function setState(s){
+  if(state === s) return;
 
-  state = newState;
-  document.getElementById("ui").innerText = "STATE: " + state;
+  state = s;
+  document.getElementById("ui").innerText =
+    "STATE: " + state + " | SINGLE USER LOCK";
 
-  // auto reset idle after 300ms
   setTimeout(()=>{
     state = "IDLE";
-    document.getElementById("ui").innerText = "STATE: IDLE";
-  },300);
+    document.getElementById("ui").innerText =
+      "STATE: IDLE | SINGLE USER LOCK";
+  }, 300);
 }
 
 //////////////////////////////
@@ -148,7 +150,6 @@ const cctx = camCanvas.getContext("2d");
 camCanvas.width = window.innerWidth * 0.35;
 camCanvas.height = window.innerHeight;
 
-// draw camera frame
 function drawCam(){
   cctx.save();
   cctx.translate(camCanvas.width,0);
@@ -157,11 +158,10 @@ function drawCam(){
   cctx.restore();
 }
 
-// draw skeleton points
 function drawPoints(lm){
   cctx.fillStyle = "red";
   [11,12,0].forEach(i=>{
-    let p = lm[i];
+    const p = lm[i];
     cctx.beginPath();
     cctx.arc(p.x*camCanvas.width,p.y*camCanvas.height,6,0,Math.PI*2);
     cctx.fill();
@@ -169,10 +169,15 @@ function drawPoints(lm){
 }
 
 //////////////////////////////
-// TRACK LOGIC (FIXED)
+// SINGLE PERSON LOCK
 //////////////////////////////
-let lastTrack = 0;
+let locked = false;
+let baseX = 0;
+let baseY = 0;
 
+//////////////////////////////
+// TRACKING
+//////////////////////////////
 function onResults(res){
   if(!res.poseLandmarks) return;
 
@@ -181,21 +186,35 @@ function onResults(res){
   lastTrack = now;
 
   const lm = res.poseLandmarks;
+  const nose = lm[0];
+
+  // =========================
+  // LOCK 1 PERSON
+  // =========================
+  if(!locked){
+    baseX = nose.x;
+    baseY = nose.y;
+    locked = true;
+  }
+
+  const dx = Math.abs(nose.x - baseX);
+  const dy = Math.abs(nose.y - baseY);
+
+  // ignore other people
+  if(dx > 0.25 || dy > 0.25) return;
 
   drawCam();
   drawPoints(lm);
 
   const left = lm[11];
   const right = lm[12];
-  const nose = lm[0];
 
-  // ===== FIXED LOGIC =====
   const diff = left.x - right.x;
   const DEADZONE = 0.06;
 
   let newState = "IDLE";
 
-  // jump priority
+  // priority: jump > move
   if(nose.y < 0.35){
     newState = "JUMP";
   }
@@ -205,13 +224,12 @@ function onResults(res){
   else if(diff < -DEADZONE){
     newState = "RIGHT";
   }
-  else{
-    newState = "IDLE";
-  }
 
   setState(newState);
 
-  // game actions
+  // =========================
+  // GAME ACTIONS
+  // =========================
   if(newState === "LEFT") player.lane = 0;
   if(newState === "RIGHT") player.lane = 2;
   if(newState === "IDLE") player.lane = 1;
@@ -228,7 +246,7 @@ function onResults(res){
 }
 
 //////////////////////////////
-// MEDIA PIPE
+// MEDIA PIPE INIT
 //////////////////////////////
 const pose = new Pose({
   locateFile: file =>
