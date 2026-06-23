@@ -1,23 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motion Runner AI Live</title>
+  <title>AI Body Controller Dashboard</title>
 
   <style>
     body {
       margin: 0;
-      overflow: hidden;
       display: flex;
-      background: black;
+      background: #0f0f0f;
       font-family: Arial;
+      color: white;
     }
 
-    /* LEFT: GAME */
-    #gameContainer {
-      width: 66.66%;
+    #game {
+      width: 65%;
       height: 100vh;
       position: relative;
       background: #111;
+    }
+
+    #panel {
+      width: 35%;
+      height: 100vh;
+      position: relative;
+      border-left: 2px solid #222;
+      background: black;
     }
 
     canvas {
@@ -26,198 +33,185 @@
       left: 0;
     }
 
-    /* RIGHT: CAMERA */
-    #cameraContainer {
-      width: 33.33%;
-      height: 100vh;
-      position: relative;
-      border-left: 2px solid #222;
-      background: black;
-    }
-
     video {
       display: none;
     }
 
-    #overlay {
-      width: 100%;
-      height: 100%;
-    }
-
-    #ui {
+    #stateBox {
       position: absolute;
       top: 10px;
       left: 10px;
-      z-index: 10;
-      color: white;
-      font-size: 12px;
-      background: rgba(0,0,0,0.5);
-      padding: 8px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
       border-radius: 8px;
+      font-size: 14px;
     }
   </style>
 </head>
 
 <body>
 
-<!-- ================= GAME ================= -->
-<div id="gameContainer">
-  <div id="ui">Motion Runner AI<br>Tracking: 0.2s stable</div>
-  <canvas id="game"></canvas>
+<!-- GAME -->
+<div id="game">
+  <canvas id="gameCanvas"></canvas>
 </div>
 
-<!-- ================= CAMERA ================= -->
-<div id="cameraContainer">
+<!-- AI PANEL -->
+<div id="panel">
   <video id="video" autoplay playsinline></video>
-  <canvas id="overlay"></canvas>
+  <canvas id="camCanvas"></canvas>
+  <div id="stateBox">STATE: IDLE</div>
 </div>
 
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 
-  // ================= GAME SETUP =================
-  const gameCanvas = document.getElementById("game");
-  const gctx = gameCanvas.getContext("2d");
+/////////////////////////////
+// GAME SETUP
+/////////////////////////////
+const g = document.getElementById("gameCanvas");
+const gctx = g.getContext("2d");
 
-  gameCanvas.width = window.innerWidth * 0.66;
-  gameCanvas.height = window.innerHeight;
+g.width = window.innerWidth * 0.65;
+g.height = window.innerHeight;
 
-  let player = {
-    lane: 1,
-    y: gameCanvas.height - 150,
-    jumping: false
-  };
+let player = { lane: 1, y: g.height - 120 };
 
-  const lanes = [
-    gameCanvas.width / 3,
-    gameCanvas.width / 2,
-    gameCanvas.width * 2 / 3
-  ];
+const lanes = [
+  g.width / 3,
+  g.width / 2,
+  g.width * 2 / 3
+];
 
-  function drawGame() {
-    gctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+function drawGame() {
+  gctx.clearRect(0,0,g.width,g.height);
 
-    // ground
-    gctx.strokeStyle = "#444";
-    gctx.beginPath();
-    gctx.moveTo(0, gameCanvas.height - 100);
-    gctx.lineTo(gameCanvas.width, gameCanvas.height - 100);
-    gctx.stroke();
+  gctx.fillStyle = "lime";
+  gctx.beginPath();
+  gctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI*2);
+  gctx.fill();
 
-    // player
-    gctx.fillStyle = "lime";
-    gctx.beginPath();
-    gctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI * 2);
-    gctx.fill();
+  requestAnimationFrame(drawGame);
+}
+drawGame();
 
-    requestAnimationFrame(drawGame);
-  }
+/////////////////////////////
+// AI STATE MACHINE
+/////////////////////////////
+let state = "IDLE";
+let lastStateTime = 0;
 
-  drawGame();
+function setState(newState) {
+  state = newState;
+  lastStateTime = Date.now();
+  document.getElementById("stateBox").innerText = "STATE: " + state;
 
-  // ================= CAMERA SETUP =================
-  const video = document.getElementById("video");
-  const overlay = document.getElementById("overlay");
-  const octx = overlay.getContext("2d");
-
-  overlay.width = window.innerWidth * 0.33;
-  overlay.height = window.innerHeight;
-
-  // ================= TRACK CONTROL =================
-  let lastTrackTime = 0;
-  const TRACK_INTERVAL = 200;
-
-  // ================= DRAW POSE =================
-  function drawPose(lm) {
-    octx.fillStyle = "red";
-
-    const points = [11, 12, 0]; // shoulders + nose
-
-    for (let i of points) {
-      const p = lm[i];
-      octx.beginPath();
-      octx.arc(p.x * overlay.width, p.y * overlay.height, 6, 0, Math.PI * 2);
-      octx.fill();
+  // auto reset về idle
+  setTimeout(() => {
+    if (Date.now() - lastStateTime >= 300) {
+      state = "IDLE";
+      document.getElementById("stateBox").innerText = "STATE: IDLE";
     }
-  }
+  }, 300);
+}
 
-  // ================= DRAW CAMERA FRAME =================
-  function drawCameraFrame() {
-    octx.save();
+/////////////////////////////
+// CAMERA PANEL
+/////////////////////////////
+const video = document.getElementById("video");
+const camCanvas = document.getElementById("camCanvas");
+const cctx = camCanvas.getContext("2d");
 
-    // mirror effect (giống gương)
-    octx.translate(overlay.width, 0);
-    octx.scale(-1, 1);
+camCanvas.width = window.innerWidth * 0.35;
+camCanvas.height = window.innerHeight;
 
-    octx.drawImage(video, 0, 0, overlay.width, overlay.height);
+function drawCameraFrame() {
+  cctx.save();
+  cctx.translate(camCanvas.width, 0);
+  cctx.scale(-1,1);
+  cctx.drawImage(video,0,0,camCanvas.width,camCanvas.height);
+  cctx.restore();
+}
 
-    octx.restore();
-  }
-
-  // ================= POSE RESULT =================
-  function onResults(results) {
-    if (!results.poseLandmarks) return;
-
-    const now = Date.now();
-    if (now - lastTrackTime < TRACK_INTERVAL) return;
-    lastTrackTime = now;
-
-    const lm = results.poseLandmarks;
-
-    // camera + pose render
-    drawCameraFrame();
-    drawPose(lm);
-
-    const left = lm[11];
-    const right = lm[12];
-    const nose = lm[0];
-
-    const diff = left.x - right.x;
-
-    // LEFT / RIGHT
-    if (diff > 0.12) player.lane = 0;
-    else if (diff < -0.12) player.lane = 2;
-    else player.lane = 1;
-
-    // JUMP
-    if (nose.y < 0.35 && !player.jumping) {
-      player.jumping = true;
-      player.y -= 120;
-
-      setTimeout(() => {
-        player.y = gameCanvas.height - 150;
-        player.jumping = false;
-      }, 450);
-    }
-  }
-
-  // ================= MEDIA PIPE =================
-  const pose = new Pose({
-    locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+function drawSkeleton(lm) {
+  cctx.fillStyle = "red";
+  [11,12,0].forEach(i=>{
+    let p = lm[i];
+    cctx.beginPath();
+    cctx.arc(p.x*camCanvas.width,p.y*camCanvas.height,6,0,Math.PI*2);
+    cctx.fill();
   });
+}
 
-  pose.setOptions({
-    modelComplexity: 1,
-    smoothLandmarks: true,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.6
-  });
+/////////////////////////////
+// POSE TRACKING
+/////////////////////////////
+let lastTrack = 0;
 
-  pose.onResults(onResults);
+function onResults(res){
+  if(!res.poseLandmarks) return;
 
-  const camera = new Camera(video, {
-    onFrame: async () => {
-      await pose.send({ image: video });
-    },
-    width: 640,
-    height: 480
-  });
+  const now = Date.now();
+  if(now - lastTrack < 200) return;
+  lastTrack = now;
 
-  camera.start();
+  const lm = res.poseLandmarks;
+
+  drawCameraFrame();
+  drawSkeleton(lm);
+
+  const left = lm[11];
+  const right = lm[12];
+  const nose = lm[0];
+
+  const diff = left.x - right.x;
+
+  // CLASSIFY ACTION
+  if(diff > 0.12){
+    setState("LEFT");
+    player.lane = 0;
+  }
+  else if(diff < -0.12){
+    setState("RIGHT");
+    player.lane = 2;
+  }
+  else if(nose.y < 0.35){
+    setState("JUMP");
+  }
+  else {
+    setState("IDLE");
+    player.lane = 1;
+  }
+}
+
+/////////////////////////////
+// MEDIA PIPE
+/////////////////////////////
+const pose = new Pose({
+  locateFile: file =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+});
+
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
+});
+
+pose.onResults(onResults);
+
+const camera = new Camera(video,{
+  onFrame: async ()=>{
+    await pose.send({image:video});
+  },
+  width:640,
+  height:480
+});
+
+camera.start();
 
 </script>
 
