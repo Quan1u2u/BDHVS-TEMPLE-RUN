@@ -1,17 +1,46 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motion Runner AI</title>
+  <title>Motion Runner AI - Live Track</title>
   <style>
     body {
       margin: 0;
       overflow: hidden;
-      background: #111;
       font-family: Arial;
-      color: white;
+      background: #000;
+      display: flex;
+    }
+
+    /* ===== LEFT: GAME ===== */
+    #gameContainer {
+      width: 66.66%;
+      height: 100vh;
+      position: relative;
+      background: #111;
     }
 
     canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* ===== RIGHT: CAMERA ===== */
+    #cameraContainer {
+      width: 33.33%;
+      height: 100vh;
+      position: relative;
+      background: black;
+      border-left: 2px solid #333;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #overlay {
       position: absolute;
       top: 0;
       left: 0;
@@ -22,144 +51,139 @@
       top: 10px;
       left: 10px;
       z-index: 10;
-      background: rgba(0,0,0,0.6);
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 14px;
-      line-height: 1.5;
+      color: white;
+      font-size: 12px;
+      background: rgba(0,0,0,0.5);
+      padding: 8px;
+      border-radius: 8px;
     }
   </style>
 </head>
 
 <body>
-  <div id="ui">
-    🕹 Motion Runner AI<br>
-    Move: LEFT / RIGHT / JUMP<br>
-    Tracking: 0.2s (stable mode)
+
+  <!-- ================= GAME SIDE ================= -->
+  <div id="gameContainer">
+    <div id="ui">Motion Runner AI<br>0.2s tracking</div>
+    <canvas id="game"></canvas>
   </div>
 
-  <video id="video" style="display:none;"></video>
-  <canvas id="game"></canvas>
+  <!-- ================= CAMERA SIDE ================= -->
+  <div id="cameraContainer">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="overlay"></canvas>
+  </div>
 
   <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
   <script>
-    // =====================
-    // CANVAS SETUP
-    // =====================
-    const videoElement = document.getElementById('video');
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
+    // ================= GAME =================
+    const gameCanvas = document.getElementById("game");
+    const gctx = gameCanvas.getContext("2d");
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    gameCanvas.width = window.innerWidth * 0.66;
+    gameCanvas.height = window.innerHeight;
 
-    // =====================
-    // GAME STATE
-    // =====================
     let player = {
       lane: 1,
-      y: canvas.height - 150,
+      y: gameCanvas.height - 150,
       jumping: false
     };
 
     const lanes = [
-      canvas.width / 3,
-      canvas.width / 2,
-      canvas.width * 2 / 3
+      gameCanvas.width / 3,
+      gameCanvas.width / 2,
+      gameCanvas.width * 2 / 3
     ];
 
-    // =====================
-    // TRACK CONTROL (0.2s)
-    // =====================
-    let lastTrackTime = 0;
-    const TRACK_INTERVAL = 200; // ms
-
-    // =====================
-    // DRAW PLAYER
-    // =====================
-    function drawPlayer() {
-      ctx.fillStyle = "lime";
-      ctx.beginPath();
-      ctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // =====================
-    // GAME LOOP (60fps)
-    // =====================
-    function updateGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function drawGame() {
+      gctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
 
       // ground
-      ctx.strokeStyle = "#444";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, canvas.height - 100);
-      ctx.lineTo(canvas.width, canvas.height - 100);
-      ctx.stroke();
+      gctx.strokeStyle = "#444";
+      gctx.beginPath();
+      gctx.moveTo(0, gameCanvas.height - 100);
+      gctx.lineTo(gameCanvas.width, gameCanvas.height - 100);
+      gctx.stroke();
 
-      drawPlayer();
+      // player
+      gctx.fillStyle = "lime";
+      gctx.beginPath();
+      gctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI * 2);
+      gctx.fill();
 
-      requestAnimationFrame(updateGame);
+      requestAnimationFrame(drawGame);
     }
 
-    updateGame();
+    drawGame();
 
-    // =====================
-    // AI TRACKING (POSE)
-    // =====================
+    // ================= CAMERA =================
+    const video = document.getElementById("video");
+    const overlay = document.getElementById("overlay");
+    const octx = overlay.getContext("2d");
+
+    overlay.width = window.innerWidth * 0.33;
+    overlay.height = window.innerHeight;
+
+    // ================= TRACK CONTROL =================
+    let lastTrackTime = 0;
+    const TRACK_INTERVAL = 200;
+
+    function drawPose(lm) {
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+
+      const points = [11, 12, 0]; // shoulders + nose
+
+      octx.fillStyle = "red";
+
+      for (let i of points) {
+        const p = lm[i];
+        octx.beginPath();
+        octx.arc(p.x * overlay.width, p.y * overlay.height, 5, 0, Math.PI * 2);
+        octx.fill();
+      }
+    }
+
     function onResults(results) {
       if (!results.poseLandmarks) return;
 
       const now = Date.now();
-
-      // 👉 chỉ update mỗi 0.2s
       if (now - lastTrackTime < TRACK_INTERVAL) return;
       lastTrackTime = now;
 
       const lm = results.poseLandmarks;
 
-      const leftShoulder = lm[11];
-      const rightShoulder = lm[12];
+      drawPose(lm);
+
+      const left = lm[11];
+      const right = lm[12];
       const nose = lm[0];
 
-      const shoulderDiff = leftShoulder.x - rightShoulder.x;
+      const diff = left.x - right.x;
 
-      // =====================
-      // LEFT / RIGHT CONTROL
-      // =====================
-      if (shoulderDiff > 0.12) {
-        player.lane = 0;
-      } else if (shoulderDiff < -0.12) {
-        player.lane = 2;
-      } else {
-        player.lane = 1;
-      }
+      // LEFT RIGHT
+      if (diff > 0.12) player.lane = 0;
+      else if (diff < -0.12) player.lane = 2;
+      else player.lane = 1;
 
-      // =====================
-      // JUMP CONTROL
-      // =====================
+      // JUMP
       if (nose.y < 0.35 && !player.jumping) {
         player.jumping = true;
         player.y -= 120;
 
         setTimeout(() => {
-          player.y = canvas.height - 150;
+          player.y = gameCanvas.height - 150;
           player.jumping = false;
         }, 450);
       }
     }
 
-    // =====================
-    // MEDIAPIPE SETUP
-    // =====================
+    // ================= MEDIAPIPE =================
     const pose = new Pose({
-      locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
-      }
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
 
     pose.setOptions({
@@ -171,15 +195,15 @@
 
     pose.onResults(onResults);
 
-    const camera = new Camera(videoElement, {
+    const cam = new Camera(video, {
       onFrame: async () => {
-        await pose.send({ image: videoElement });
+        await pose.send({ image: video });
       },
       width: 640,
       height: 480
     });
 
-    camera.start();
+    cam.start();
   </script>
 </body>
 </html>
