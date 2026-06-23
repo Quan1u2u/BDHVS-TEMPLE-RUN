@@ -10,17 +10,22 @@
       top: 10px;
       left: 10px;
       z-index: 10;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 8px;
     }
   </style>
 </head>
 
 <body>
-  <div id="ui">Move your body: LEFT / RIGHT / JUMP</div>
+  <div id="ui">Move: LEFT / RIGHT / JUMP</div>
+
   <video id="video" style="display:none;"></video>
   <canvas id="game"></canvas>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+  <!-- ✅ FIX: đúng CDN chuẩn -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
   <script>
     const videoElement = document.getElementById('video');
@@ -30,27 +35,24 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // ===== GAME STATE =====
     let player = {
-      lane: 1, // 0 trái, 1 giữa, 2 phải
+      lane: 1,
       y: canvas.height - 150,
       jumping: false
     };
 
-    // ===== DRAW PLAYER =====
     function drawPlayer() {
       const laneX = [canvas.width/3, canvas.width/2, canvas.width*2/3];
+
       ctx.fillStyle = "lime";
       ctx.beginPath();
       ctx.arc(laneX[player.lane], player.y, 25, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // ===== UPDATE GAME =====
     function updateGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // ground
       ctx.strokeStyle = "#444";
       ctx.beginPath();
       ctx.moveTo(0, canvas.height - 100);
@@ -63,7 +65,6 @@
 
     updateGame();
 
-    // ===== MOTION LOGIC =====
     function onResults(results) {
       if (!results.poseLandmarks) return;
 
@@ -75,13 +76,13 @@
 
       const shoulderDiff = leftShoulder.x - rightShoulder.x;
 
-      // 👉 nghiêng trái / phải
-      if (shoulderDiff > 0.15) player.lane = 0;
-      else if (shoulderDiff < -0.15) player.lane = 2;
+      // 👉 lane control
+      if (shoulderDiff > 0.12) player.lane = 0;
+      else if (shoulderDiff < -0.12) player.lane = 2;
       else player.lane = 1;
 
-      // 👉 nhảy (nose cao lên)
-      if (nose.y < 0.3 && !player.jumping) {
+      // 👉 jump
+      if (nose.y < 0.35 && !player.jumping) {
         player.jumping = true;
         player.y -= 120;
 
@@ -92,8 +93,8 @@
       }
     }
 
-    // ===== MEDIAPIPE SETUP =====
-    const pose = new Pose.Pose({
+    // ✅ FIX: đúng constructor
+    const pose = new Pose({
       locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
       }
