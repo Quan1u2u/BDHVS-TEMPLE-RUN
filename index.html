@@ -1,227 +1,133 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8"/>
-<title>AI Motion Runner HEAVY MODE</title>
-
-<style>
-body {
-  margin: 0;
-  display: flex;
-  background: black;
-  overflow: hidden;
-  font-family: Arial;
-}
-
-#game { width: 65%; height: 100vh; }
-#cam { width: 35%; height: 100vh; position: relative; }
-
-video {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  transform: scaleX(-1);
-  object-fit: cover;
-}
-
-canvas { position: absolute; top:0; left:0; }
-
-#ui {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  color: white;
-  padding: 10px;
-  background: rgba(0,0,0,0.5);
-}
-</style>
+  <title>Motion Runner Demo FIX</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; color: white; font-family: Arial; }
+    canvas { position: absolute; top: 0; left: 0; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+    }
+  </style>
 </head>
 
 <body>
+  <div id="ui">Move: LEFT / RIGHT / JUMP</div>
+  <video id="video" style="display:none;"></video>
+  <canvas id="game"></canvas>
 
-<div id="game">
-  <canvas id="gameCanvas"></canvas>
-</div>
+  <!-- ✅ FIX: load FULL mediapipe pose -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 
-<div id="cam">
-  <video id="video" autoplay playsinline></video>
-  <canvas id="overlay"></canvas>
-  <div id="ui">STATE</div>
-</div>
+  <script>
+    const videoElement = document.getElementById('video');
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-<script>
-// ================= CANVAS =================
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+    // ================= GAME STATE =================
+    let player = {
+      lane: 1,
+      y: canvas.height - 150,
+      jumping: false
+    };
 
-canvas.width = window.innerWidth * 0.65;
-canvas.height = window.innerHeight;
+    const laneX = [
+      canvas.width/3,
+      canvas.width/2,
+      canvas.width*2/3
+    ];
 
-// ================= GAME STATE =================
-let player = { x:0, lane:1, jump:0 };
-const lanes = [canvas.width*0.3, canvas.width*0.5, canvas.width*0.7];
+    // ================= RENDER LOOP =================
+    function updateGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-let state="IDLE";
-let ema=0;
-let base=null;
-let history=[];
+      // ground
+      ctx.strokeStyle = "#444";
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height - 100);
+      ctx.lineTo(canvas.width, canvas.height - 100);
+      ctx.stroke();
 
-let score=0;
-let combo=0;
-let speed=6;
-let shake=0;
+      // player
+      ctx.fillStyle = "lime";
+      ctx.beginPath();
+      ctx.arc(laneX[player.lane], player.y, 25, 0, Math.PI * 2);
+      ctx.fill();
 
-// ================= OBSTACLES =================
-let obstacles=[];
-function spawn(){
-  obstacles.push({
-    lane: Math.floor(Math.random()*3),
-    y: -50,
-    size: 40 + Math.random()*20
-  });
-}
-
-// spam obstacles
-setInterval(spawn, 800);
-
-// ================= CAMERA =================
-const video=document.getElementById("video");
-
-navigator.mediaDevices.getUserMedia({
-  video:{facingMode:"user"}
-}).then(s=>{
-  video.srcObject=s;
-});
-
-// ================= POSE =================
-const pose=new Pose.Pose({
-  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
-});
-
-pose.setOptions({
-  modelComplexity:1,
-  smoothLandmarks:true
-});
-
-function loopDetect(){
-  if(video.readyState>=2){
-    pose.send({image:video});
-  }
-  requestAnimationFrame(loopDetect);
-}
-loopDetect();
-
-// ================= STATE =================
-pose.onResults(res=>{
-  if(!res.poseLandmarks) return;
-
-  let lm=res.poseLandmarks;
-  let nose=lm[0];
-  let l=lm[11];
-  let r=lm[12];
-
-  if(!base) base=nose.x;
-
-  let offset=nose.x-base;
-  ema=ema*0.8 + offset*0.2;
-
-  let s="IDLE";
-  let DEAD=0.07;
-
-  if(Math.abs(ema)<DEAD) s="IDLE";
-  else if(ema<-DEAD) s="LEFT";
-  else if(ema>DEAD) s="RIGHT";
-
-  if(Math.abs(l.y-r.y)<0.02) s="JUMP";
-
-  history.push(s);
-  if(history.length>7) history.shift();
-
-  state=history.sort((a,b)=>
-    history.filter(v=>v===b).length -
-    history.filter(v=>v===a).length
-  )[0];
-
-  document.getElementById("ui").innerText=
-    `STATE: ${state} | SCORE: ${score} | COMBO: ${combo}`;
-});
-
-// ================= GAME LOOP =================
-function update(){
-  if(state==="LEFT") player.lane=0;
-  if(state==="RIGHT") player.lane=2;
-  if(state==="IDLE") player.lane=1;
-
-  if(state==="JUMP") player.jump=80;
-
-  player.x += ((lanes[player.lane])-player.x)*0.2;
-  player.jump *= 0.85;
-
-  speed += 0.002;
-
-  for(let o of obstacles){
-    o.y += speed;
-
-    if(o.lane===player.lane && Math.abs(o.y-400)<40){
-      shake=20;
-      combo=0;
+      requestAnimationFrame(updateGame);
     }
-    else if(o.y>400){
-      score++;
-      combo++;
+    updateGame();
+
+    // ================= MOTION LOGIC =================
+    function onResults(results) {
+      if (!results.poseLandmarks) return;
+
+      const lm = results.poseLandmarks;
+
+      const leftShoulder = lm[11];
+      const rightShoulder = lm[12];
+      const nose = lm[0];
+
+      const shoulderDiff = leftShoulder.x - rightShoulder.x;
+
+      // ===== LEFT / RIGHT (FIXED THRESHOLD) =====
+      if (shoulderDiff > 0.12) player.lane = 0;
+      else if (shoulderDiff < -0.12) player.lane = 2;
+      else player.lane = 1;
+
+      // ===== JUMP (FIXED LOGIC) =====
+      if (nose.y < 0.28 && !player.jumping) {
+        player.jumping = true;
+        player.y -= 120;
+
+        setTimeout(() => {
+          player.y = canvas.height - 150;
+          player.jumping = false;
+        }, 500);
+      }
     }
-  }
 
-  obstacles=obstacles.filter(o=>o.y<800);
-}
+    // ================= MEDIAPIPE INIT FIX =================
+    const pose = new Pose({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+      }
+    });
 
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
 
-  // shake effect
-  let sx=(Math.random()-0.5)*shake;
-  let sy=(Math.random()-0.5)*shake;
-  shake*=0.9;
+    pose.onResults(onResults);
 
-  ctx.save();
-  ctx.translate(sx,sy);
+    // ================= CAMERA FIX (NO CameraUtils) =================
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false
+      });
 
-  // road animation
-  for(let i=0;i<10;i++){
-    ctx.fillStyle=`rgb(${20+i*2},20,20)`;
-    ctx.fillRect(0,i*80,(canvas.width),40);
-  }
+      videoElement.srcObject = stream;
+      await videoElement.play();
 
-  // lanes
-  for(let i=1;i<3;i++){
-    ctx.fillStyle="#333";
-    ctx.fillRect(canvas.width*i/3,0,2,canvas.height);
-  }
+      // frame loop → GUARANTEED WORK
+      function loop() {
+        pose.send({ image: videoElement });
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
 
-  // obstacles
-  for(let o of obstacles){
-    ctx.fillStyle="red";
-    ctx.fillRect(lanes[o.lane]-20,o.y,o.size,o.size);
-  }
-
-  // player
-  ctx.fillStyle="cyan";
-  ctx.beginPath();
-  ctx.arc(player.x,400-player.jump,30,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.restore();
-}
-
-function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-loop();
-</script>
-
+    startCamera();
+  </script>
 </body>
 </html>
