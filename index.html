@@ -1,30 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Body Controller Dashboard</title>
+  <title>AI Motion Runner Stable</title>
 
   <style>
     body {
       margin: 0;
       display: flex;
-      background: #0f0f0f;
+      overflow: hidden;
       font-family: Arial;
+      background: black;
       color: white;
     }
 
-    #game {
+    /* GAME */
+    #gameArea {
       width: 65%;
       height: 100vh;
       position: relative;
       background: #111;
-    }
-
-    #panel {
-      width: 35%;
-      height: 100vh;
-      position: relative;
-      border-left: 2px solid #222;
-      background: black;
     }
 
     canvas {
@@ -33,51 +27,70 @@
       left: 0;
     }
 
+    /* CAMERA */
+    #camArea {
+      width: 35%;
+      height: 100vh;
+      position: relative;
+      border-left: 2px solid #222;
+      background: black;
+    }
+
     video {
       display: none;
     }
 
-    #stateBox {
+    #camCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    #ui {
       position: absolute;
       top: 10px;
       left: 10px;
       background: rgba(0,0,0,0.6);
-      padding: 10px;
+      padding: 8px;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 13px;
     }
   </style>
 </head>
 
 <body>
 
-<!-- GAME -->
-<div id="game">
-  <canvas id="gameCanvas"></canvas>
+<!-- ================= GAME ================= -->
+<div id="gameArea">
+  <div id="ui">STATE: IDLE</div>
+  <canvas id="game"></canvas>
 </div>
 
-<!-- AI PANEL -->
-<div id="panel">
+<!-- ================= CAMERA ================= -->
+<div id="camArea">
   <video id="video" autoplay playsinline></video>
   <canvas id="camCanvas"></canvas>
-  <div id="stateBox">STATE: IDLE</div>
 </div>
 
+<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 
-/////////////////////////////
+//////////////////////////////
 // GAME SETUP
-/////////////////////////////
-const g = document.getElementById("gameCanvas");
+//////////////////////////////
+const g = document.getElementById("game");
 const gctx = g.getContext("2d");
 
 g.width = window.innerWidth * 0.65;
 g.height = window.innerHeight;
 
-let player = { lane: 1, y: g.height - 120 };
+let player = {
+  lane: 1,
+  y: g.height - 140,
+  jumping: false
+};
 
 const lanes = [
   g.width / 3,
@@ -85,9 +98,17 @@ const lanes = [
   g.width * 2 / 3
 ];
 
-function drawGame() {
+function drawGame(){
   gctx.clearRect(0,0,g.width,g.height);
 
+  // ground
+  gctx.strokeStyle = "#444";
+  gctx.beginPath();
+  gctx.moveTo(0, g.height - 100);
+  gctx.lineTo(g.width, g.height - 100);
+  gctx.stroke();
+
+  // player
   gctx.fillStyle = "lime";
   gctx.beginPath();
   gctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI*2);
@@ -95,31 +116,31 @@ function drawGame() {
 
   requestAnimationFrame(drawGame);
 }
+
 drawGame();
 
-/////////////////////////////
-// AI STATE MACHINE
-/////////////////////////////
+//////////////////////////////
+// STATE MACHINE
+//////////////////////////////
 let state = "IDLE";
-let lastStateTime = 0;
+let lastUpdate = 0;
 
-function setState(newState) {
+function setState(newState){
+  if(state === newState) return;
+
   state = newState;
-  lastStateTime = Date.now();
-  document.getElementById("stateBox").innerText = "STATE: " + state;
+  document.getElementById("ui").innerText = "STATE: " + state;
 
-  // auto reset về idle
-  setTimeout(() => {
-    if (Date.now() - lastStateTime >= 300) {
-      state = "IDLE";
-      document.getElementById("stateBox").innerText = "STATE: IDLE";
-    }
-  }, 300);
+  // auto reset idle after 300ms
+  setTimeout(()=>{
+    state = "IDLE";
+    document.getElementById("ui").innerText = "STATE: IDLE";
+  },300);
 }
 
-/////////////////////////////
-// CAMERA PANEL
-/////////////////////////////
+//////////////////////////////
+// CAMERA
+//////////////////////////////
 const video = document.getElementById("video");
 const camCanvas = document.getElementById("camCanvas");
 const cctx = camCanvas.getContext("2d");
@@ -127,15 +148,17 @@ const cctx = camCanvas.getContext("2d");
 camCanvas.width = window.innerWidth * 0.35;
 camCanvas.height = window.innerHeight;
 
-function drawCameraFrame() {
+// draw camera frame
+function drawCam(){
   cctx.save();
-  cctx.translate(camCanvas.width, 0);
+  cctx.translate(camCanvas.width,0);
   cctx.scale(-1,1);
   cctx.drawImage(video,0,0,camCanvas.width,camCanvas.height);
   cctx.restore();
 }
 
-function drawSkeleton(lm) {
+// draw skeleton points
+function drawPoints(lm){
   cctx.fillStyle = "red";
   [11,12,0].forEach(i=>{
     let p = lm[i];
@@ -145,9 +168,9 @@ function drawSkeleton(lm) {
   });
 }
 
-/////////////////////////////
-// POSE TRACKING
-/////////////////////////////
+//////////////////////////////
+// TRACK LOGIC (FIXED)
+//////////////////////////////
 let lastTrack = 0;
 
 function onResults(res){
@@ -159,36 +182,54 @@ function onResults(res){
 
   const lm = res.poseLandmarks;
 
-  drawCameraFrame();
-  drawSkeleton(lm);
+  drawCam();
+  drawPoints(lm);
 
   const left = lm[11];
   const right = lm[12];
   const nose = lm[0];
 
+  // ===== FIXED LOGIC =====
   const diff = left.x - right.x;
+  const DEADZONE = 0.06;
 
-  // CLASSIFY ACTION
-  if(diff > 0.12){
-    setState("LEFT");
-    player.lane = 0;
+  let newState = "IDLE";
+
+  // jump priority
+  if(nose.y < 0.35){
+    newState = "JUMP";
   }
-  else if(diff < -0.12){
-    setState("RIGHT");
-    player.lane = 2;
+  else if(diff > DEADZONE){
+    newState = "LEFT";
   }
-  else if(nose.y < 0.35){
-    setState("JUMP");
+  else if(diff < -DEADZONE){
+    newState = "RIGHT";
   }
-  else {
-    setState("IDLE");
-    player.lane = 1;
+  else{
+    newState = "IDLE";
+  }
+
+  setState(newState);
+
+  // game actions
+  if(newState === "LEFT") player.lane = 0;
+  if(newState === "RIGHT") player.lane = 2;
+  if(newState === "IDLE") player.lane = 1;
+
+  if(newState === "JUMP" && !player.jumping){
+    player.jumping = true;
+    player.y -= 120;
+
+    setTimeout(()=>{
+      player.y = g.height - 140;
+      player.jumping = false;
+    },450);
   }
 }
 
-/////////////////////////////
+//////////////////////////////
 // MEDIA PIPE
-/////////////////////////////
+//////////////////////////////
 const pose = new Pose({
   locateFile: file =>
     `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
