@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
-<title>AI Motion Runner FIX</title>
+<meta charset="utf-8"/>
+<title>AI Motion Runner HEAVY MODE</title>
 
 <style>
 body {
@@ -13,17 +13,8 @@ body {
   font-family: Arial;
 }
 
-#game {
-  width: 65%;
-  height: 100vh;
-  background: #111;
-}
-
-#cam {
-  width: 35%;
-  height: 100vh;
-  position: relative;
-}
+#game { width: 65%; height: 100vh; }
+#cam { width: 35%; height: 100vh; position: relative; }
 
 video {
   position: absolute;
@@ -33,19 +24,15 @@ video {
   object-fit: cover;
 }
 
-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
+canvas { position: absolute; top:0; left:0; }
 
-#state {
+#ui {
   position: absolute;
   bottom: 10px;
   left: 10px;
   color: white;
-  background: rgba(0,0,0,0.6);
   padding: 10px;
+  background: rgba(0,0,0,0.5);
 }
 </style>
 </head>
@@ -59,163 +46,178 @@ canvas {
 <div id="cam">
   <video id="video" autoplay playsinline></video>
   <canvas id="overlay"></canvas>
-  <div id="state">STATE: IDLE</div>
+  <div id="ui">STATE</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 <script>
-// ================= GAME =================
+// ================= CANVAS =================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth * 0.65;
 canvas.height = window.innerHeight;
 
-let player = { x: canvas.width/2, lane:1, y:canvas.height-120, jump:0 };
+// ================= GAME STATE =================
+let player = { x:0, lane:1, jump:0 };
+const lanes = [canvas.width*0.3, canvas.width*0.5, canvas.width*0.7];
 
-const lanes = [
-  canvas.width * 0.3,
-  canvas.width * 0.5,
-  canvas.width * 0.7
-];
+let state="IDLE";
+let ema=0;
+let base=null;
+let history=[];
 
-// ================= CAMERA FIX =================
-const video = document.getElementById("video");
+let score=0;
+let combo=0;
+let speed=6;
+let shake=0;
 
-async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user" },
-    audio: false
+// ================= OBSTACLES =================
+let obstacles=[];
+function spawn(){
+  obstacles.push({
+    lane: Math.floor(Math.random()*3),
+    y: -50,
+    size: 40 + Math.random()*20
   });
-
-  video.srcObject = stream;
-  await video.play();
 }
-startCamera();
 
-// ================= MEDIAPIPE =================
-const pose = new Pose.Pose({
-  locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+// spam obstacles
+setInterval(spawn, 800);
+
+// ================= CAMERA =================
+const video=document.getElementById("video");
+
+navigator.mediaDevices.getUserMedia({
+  video:{facingMode:"user"}
+}).then(s=>{
+  video.srcObject=s;
+});
+
+// ================= POSE =================
+const pose=new Pose.Pose({
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
 
 pose.setOptions({
-  modelComplexity: 1,
-  smoothLandmarks: true,
-  minDetectionConfidence: 0.6,
-  minTrackingConfidence: 0.6
+  modelComplexity:1,
+  smoothLandmarks:true
 });
+
+function loopDetect(){
+  if(video.readyState>=2){
+    pose.send({image:video});
+  }
+  requestAnimationFrame(loopDetect);
+}
+loopDetect();
 
 // ================= STATE =================
-let state = "IDLE";
-let history = [];
+pose.onResults(res=>{
+  if(!res.poseLandmarks) return;
 
-// smoothing
-let ema = { nose:0 };
-const alpha = 0.2;
-let base = null;
+  let lm=res.poseLandmarks;
+  let nose=lm[0];
+  let l=lm[11];
+  let r=lm[12];
 
-// ================= MAIN LOOP =================
-async function detect() {
-  if (video.readyState >= 2) {
-    await pose.send({ image: video });
-  }
-  requestAnimationFrame(detect);
-}
-detect();
+  if(!base) base=nose.x;
 
-// ================= RESULTS =================
-pose.onResults(results => {
-  if (!results.poseLandmarks) return;
+  let offset=nose.x-base;
+  ema=ema*0.8 + offset*0.2;
 
-  const lm = results.poseLandmarks;
-  const nose = lm[0];
-  const l = lm[11];
-  const r = lm[12];
+  let s="IDLE";
+  let DEAD=0.07;
 
-  if (!base) base = nose.x;
+  if(Math.abs(ema)<DEAD) s="IDLE";
+  else if(ema<-DEAD) s="LEFT";
+  else if(ema>DEAD) s="RIGHT";
 
-  let offset = nose.x - base;
+  if(Math.abs(l.y-r.y)<0.02) s="JUMP";
 
-  // EMA smoothing
-  ema.nose = alpha * offset + (1 - alpha) * ema.nose;
+  history.push(s);
+  if(history.length>7) history.shift();
 
-  const DEAD = 0.07;
-  let newState = "IDLE";
+  state=history.sort((a,b)=>
+    history.filter(v=>v===b).length -
+    history.filter(v=>v===a).length
+  )[0];
 
-  if (Math.abs(ema.nose) < DEAD) newState = "IDLE";
-  else if (ema.nose < -DEAD) newState = "LEFT";
-  else if (ema.nose > DEAD) newState = "RIGHT";
-
-  // jump heuristic
-  if (Math.abs(l.y - r.y) < 0.02) newState = "JUMP";
-
-  history.push(newState);
-  if (history.length > 5) history.shift();
-
-  state = majority(history);
-
-  document.getElementById("state").innerText = "STATE: " + state;
-
-  draw(lm);
+  document.getElementById("ui").innerText=
+    `STATE: ${state} | SCORE: ${score} | COMBO: ${combo}`;
 });
 
-// ================= DRAW =================
-function draw(lm) {
-  const c = document.getElementById("overlay");
-  c.width = video.videoWidth;
-  c.height = video.videoHeight;
-  const cctx = c.getContext("2d");
-
-  cctx.clearRect(0,0,c.width,c.height);
-
-  drawPoint(cctx, lm[0]);
-  drawPoint(cctx, lm[11]);
-  drawPoint(cctx, lm[12]);
-}
-
-function drawPoint(ctx,p){
-  ctx.fillStyle="red";
-  ctx.beginPath();
-  ctx.arc(p.x*video.videoWidth, p.y*video.videoHeight,6,0,Math.PI*2);
-  ctx.fill();
-}
-
-// ================= MAJORITY =================
-function majority(arr){
-  const map={};
-  let best="IDLE", max=0;
-  for(let x of arr){
-    map[x]=(map[x]||0)+1;
-    if(map[x]>max){max=map[x];best=x;}
-  }
-  return best;
-}
-
 // ================= GAME LOOP =================
-function loop(){
+function update(){
   if(state==="LEFT") player.lane=0;
   if(state==="RIGHT") player.lane=2;
   if(state==="IDLE") player.lane=1;
 
-  player.x += (lanes[player.lane]-player.x)*0.15;
+  if(state==="JUMP") player.jump=80;
 
-  if(state==="JUMP") player.jump=60;
-  else player.jump*=0.9;
+  player.x += ((lanes[player.lane])-player.x)*0.2;
+  player.jump *= 0.85;
 
+  speed += 0.002;
+
+  for(let o of obstacles){
+    o.y += speed;
+
+    if(o.lane===player.lane && Math.abs(o.y-400)<40){
+      shake=20;
+      combo=0;
+    }
+    else if(o.y>400){
+      score++;
+      combo++;
+    }
+  }
+
+  obstacles=obstacles.filter(o=>o.y<800);
+}
+
+function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle="#222";
+  // shake effect
+  let sx=(Math.random()-0.5)*shake;
+  let sy=(Math.random()-0.5)*shake;
+  shake*=0.9;
+
+  ctx.save();
+  ctx.translate(sx,sy);
+
+  // road animation
+  for(let i=0;i<10;i++){
+    ctx.fillStyle=`rgb(${20+i*2},20,20)`;
+    ctx.fillRect(0,i*80,(canvas.width),40);
+  }
+
+  // lanes
   for(let i=1;i<3;i++){
+    ctx.fillStyle="#333";
     ctx.fillRect(canvas.width*i/3,0,2,canvas.height);
   }
 
+  // obstacles
+  for(let o of obstacles){
+    ctx.fillStyle="red";
+    ctx.fillRect(lanes[o.lane]-20,o.y,o.size,o.size);
+  }
+
+  // player
   ctx.fillStyle="cyan";
   ctx.beginPath();
-  ctx.arc(player.x, player.y-player.jump,30,0,Math.PI*2);
+  ctx.arc(player.x,400-player.jump,30,0,Math.PI*2);
   ctx.fill();
 
+  ctx.restore();
+}
+
+function loop(){
+  update();
+  draw();
   requestAnimationFrame(loop);
 }
 loop();
