@@ -1,96 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<title>AI Motion Runner Dashboard</title>
+<meta charset="utf-8" />
+<title>AI Motion Runner FIX</title>
 
 <style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    display: flex;
-    background: #0f0f0f;
-    font-family: Arial;
-  }
+body {
+  margin: 0;
+  display: flex;
+  background: black;
+  overflow: hidden;
+  font-family: Arial;
+}
 
-  #gameContainer {
-    width: 65%;
-    height: 100vh;
-    background: #111;
-  }
+#game {
+  width: 65%;
+  height: 100vh;
+  background: #111;
+}
 
-  #cameraContainer {
-    width: 35%;
-    height: 100vh;
-    position: relative;
-    background: #000;
-  }
+#cam {
+  width: 35%;
+  height: 100vh;
+  position: relative;
+}
 
-  canvas {
-    display: block;
-  }
+video {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+  object-fit: cover;
+}
 
-  #video {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    transform: scaleX(-1);
-    object-fit: cover;
-  }
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
 
-  #overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-  }
-
-  #stateBox {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    color: white;
-    font-size: 20px;
-    background: rgba(0,0,0,0.5);
-    padding: 10px;
-  }
+#state {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: white;
+  background: rgba(0,0,0,0.6);
+  padding: 10px;
+}
 </style>
-
 </head>
+
 <body>
 
-<div id="gameContainer">
+<div id="game">
   <canvas id="gameCanvas"></canvas>
 </div>
 
-<div id="cameraContainer">
-  <video id="video" autoplay></video>
+<div id="cam">
+  <video id="video" autoplay playsinline></video>
   <canvas id="overlay"></canvas>
-  <div id="stateBox">STATE: IDLE</div>
+  <div id="state">STATE: IDLE</div>
 </div>
 
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 <script>
-// ==========================
-// GAME SETUP
-// ==========================
+// ================= GAME =================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth * 0.65;
 canvas.height = window.innerHeight;
 
-let player = {
-  lane: 1,
-  x: canvas.width / 2,
-  y: canvas.height - 120,
-  targetX: canvas.width / 2,
-  jumping: false,
-  jumpY: 0
-};
+let player = { x: canvas.width/2, lane:1, y:canvas.height-120, jump:0 };
 
 const lanes = [
   canvas.width * 0.3,
@@ -98,35 +81,23 @@ const lanes = [
   canvas.width * 0.7
 ];
 
-// ==========================
-// STATE MACHINE
-// ==========================
-let currentState = "IDLE";
-let history = [];
+// ================= CAMERA FIX =================
+const video = document.getElementById("video");
 
-// ==========================
-// SMOOTHING
-// ==========================
-let ema = { left: 0, right: 0, nose: 0 };
-const alpha = 0.2;
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user" },
+    audio: false
+  });
 
-// ==========================
-// SINGLE PERSON LOCK
-// ==========================
-let locked = false;
-let baseNose = null;
+  video.srcObject = stream;
+  await video.play();
+}
+startCamera();
 
-// ==========================
-// CAMERA
-// ==========================
-const videoElement = document.getElementById("video");
-
-// ==========================
-// MEDIAPIPE POSE
-// ==========================
+// ================= MEDIAPIPE =================
 const pose = new Pose.Pose({
-  locateFile: (file) =>
-    `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+  locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
 
 pose.setOptions({
@@ -136,174 +107,117 @@ pose.setOptions({
   minTrackingConfidence: 0.6
 });
 
-pose.onResults(onResults);
+// ================= STATE =================
+let state = "IDLE";
+let history = [];
 
-// ==========================
-// CAMERA START
-// ==========================
-const camera = new Camera.Camera(videoElement, {
-  onFrame: async () => {
-    await pose.send({ image: videoElement });
-  },
-  width: 640,
-  height: 480
-});
+// smoothing
+let ema = { nose:0 };
+const alpha = 0.2;
+let base = null;
 
-camera.start();
+// ================= MAIN LOOP =================
+async function detect() {
+  if (video.readyState >= 2) {
+    await pose.send({ image: video });
+  }
+  requestAnimationFrame(detect);
+}
+detect();
 
-// ==========================
-// RESULTS PROCESSING
-// ==========================
-function onResults(results) {
-  const canvasOverlay = document.getElementById("overlay");
-  canvasOverlay.width = videoElement.videoWidth;
-  canvasOverlay.height = videoElement.videoHeight;
-
-  const ctx2 = canvasOverlay.getContext("2d");
-  ctx2.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
-
+// ================= RESULTS =================
+pose.onResults(results => {
   if (!results.poseLandmarks) return;
 
   const lm = results.poseLandmarks;
-
   const nose = lm[0];
-  const leftShoulder = lm[11];
-  const rightShoulder = lm[12];
+  const l = lm[11];
+  const r = lm[12];
 
-  // ==========================
-  // SINGLE PERSON LOCK
-  // ==========================
-  if (!locked) {
-    baseNose = nose.x;
-    locked = true;
-  }
+  if (!base) base = nose.x;
 
-  const noseOffset = nose.x - baseNose;
+  let offset = nose.x - base;
 
-  // ==========================
-  // EMA SMOOTHING
-  // ==========================
-  ema.left = alpha * leftShoulder.x + (1 - alpha) * ema.left;
-  ema.right = alpha * rightShoulder.x + (1 - alpha) * ema.right;
-  ema.nose = alpha * noseOffset + (1 - alpha) * ema.nose;
+  // EMA smoothing
+  ema.nose = alpha * offset + (1 - alpha) * ema.nose;
 
-  const shoulderDiff = ema.right - ema.left;
-  const offset = ema.nose;
+  const DEAD = 0.07;
+  let newState = "IDLE";
 
-  // ==========================
-  // CLASSIFICATION
-  // ==========================
-  let state = "IDLE";
+  if (Math.abs(ema.nose) < DEAD) newState = "IDLE";
+  else if (ema.nose < -DEAD) newState = "LEFT";
+  else if (ema.nose > DEAD) newState = "RIGHT";
 
-  const DEADZONE = 0.07;
+  // jump heuristic
+  if (Math.abs(l.y - r.y) < 0.02) newState = "JUMP";
 
-  if (Math.abs(offset) < DEADZONE) {
-    state = "IDLE";
-  } else if (offset < -DEADZONE) {
-    state = "LEFT";
-  } else if (offset > DEADZONE) {
-    state = "RIGHT";
-  }
-
-  // SIMPLE JUMP (both shoulders high heuristic)
-  if (Math.abs(leftShoulder.y - rightShoulder.y) < 0.02) {
-    state = "JUMP";
-  }
-
-  // ==========================
-  // HISTORY VOTING
-  // ==========================
-  history.push(state);
+  history.push(newState);
   if (history.length > 5) history.shift();
 
-  const finalState = mode(history);
+  state = majority(history);
 
-  currentState = finalState;
-  document.getElementById("stateBox").innerText = "STATE: " + currentState;
+  document.getElementById("state").innerText = "STATE: " + state;
 
-  // ==========================
-  // DRAW SKELETON
-  // ==========================
-  drawPoint(ctx2, nose);
-  drawPoint(ctx2, leftShoulder);
-  drawPoint(ctx2, rightShoulder);
+  draw(lm);
+});
+
+// ================= DRAW =================
+function draw(lm) {
+  const c = document.getElementById("overlay");
+  c.width = video.videoWidth;
+  c.height = video.videoHeight;
+  const cctx = c.getContext("2d");
+
+  cctx.clearRect(0,0,c.width,c.height);
+
+  drawPoint(cctx, lm[0]);
+  drawPoint(cctx, lm[11]);
+  drawPoint(cctx, lm[12]);
 }
 
-function drawPoint(ctx, p) {
-  ctx.fillStyle = "red";
+function drawPoint(ctx,p){
+  ctx.fillStyle="red";
   ctx.beginPath();
-  ctx.arc(p.x * 640, p.y * 480, 6, 0, Math.PI * 2);
+  ctx.arc(p.x*video.videoWidth, p.y*video.videoHeight,6,0,Math.PI*2);
   ctx.fill();
 }
 
-// ==========================
-// MODE (MAJORITY VOTE)
-// ==========================
-function mode(arr) {
-  const freq = {};
-  let max = 0;
-  let res = "IDLE";
-
-  for (let v of arr) {
-    freq[v] = (freq[v] || 0) + 1;
-    if (freq[v] > max) {
-      max = freq[v];
-      res = v;
-    }
+// ================= MAJORITY =================
+function majority(arr){
+  const map={};
+  let best="IDLE", max=0;
+  for(let x of arr){
+    map[x]=(map[x]||0)+1;
+    if(map[x]>max){max=map[x];best=x;}
   }
-  return res;
+  return best;
 }
 
-// ==========================
-// GAME LOOP
-// ==========================
-function updateGame() {
-  // lane control
-  if (currentState === "LEFT") player.lane = 0;
-  if (currentState === "RIGHT") player.lane = 2;
-  if (currentState === "IDLE") player.lane = 1;
+// ================= GAME LOOP =================
+function loop(){
+  if(state==="LEFT") player.lane=0;
+  if(state==="RIGHT") player.lane=2;
+  if(state==="IDLE") player.lane=1;
 
-  // jump
-  if (currentState === "JUMP" && !player.jumping) {
-    player.jumping = true;
-    player.jumpY = 80;
-    setTimeout(() => {
-      player.jumping = false;
-      player.jumpY = 0;
-    }, 500);
+  player.x += (lanes[player.lane]-player.x)*0.15;
+
+  if(state==="JUMP") player.jump=60;
+  else player.jump*=0.9;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle="#222";
+  for(let i=1;i<3;i++){
+    ctx.fillRect(canvas.width*i/3,0,2,canvas.height);
   }
 
-  player.targetX = lanes[player.lane];
-
-  // smooth movement
-  player.x += (player.targetX - player.x) * 0.15;
-}
-
-function drawGame() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // lanes
-  ctx.strokeStyle = "#333";
-  for (let i = 1; i < 3; i++) {
-    ctx.beginPath();
-    ctx.moveTo(canvas.width * (i / 3), 0);
-    ctx.lineTo(canvas.width * (i / 3), canvas.height);
-    ctx.stroke();
-  }
-
-  // player
-  ctx.fillStyle = "cyan";
+  ctx.fillStyle="cyan";
   ctx.beginPath();
-  ctx.arc(player.x, player.y - player.jumpY, 30, 0, Math.PI * 2);
+  ctx.arc(player.x, player.y-player.jump,30,0,Math.PI*2);
   ctx.fill();
-}
 
-function loop() {
-  updateGame();
-  drawGame();
   requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 
