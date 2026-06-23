@@ -1,33 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motion Runner Demo</title>
+  <title>Motion Runner AI</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #111; color: white; font-family: Arial; }
-    canvas { position: absolute; top: 0; left: 0; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+      font-family: Arial;
+      color: white;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
     #ui {
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 10;
-      background: rgba(0,0,0,0.5);
-      padding: 10px;
-      border-radius: 8px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.5;
     }
   </style>
 </head>
 
 <body>
-  <div id="ui">Move: LEFT / RIGHT / JUMP</div>
+  <div id="ui">
+    🕹 Motion Runner AI<br>
+    Move: LEFT / RIGHT / JUMP<br>
+    Tracking: 0.2s (stable mode)
+  </div>
 
   <video id="video" style="display:none;"></video>
   <canvas id="game"></canvas>
 
-  <!-- ✅ FIX: đúng CDN chuẩn -->
+  <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
   <script>
+    // =====================
+    // CANVAS SETUP
+    // =====================
     const videoElement = document.getElementById('video');
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -35,38 +56,69 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
+    // =====================
+    // GAME STATE
+    // =====================
     let player = {
       lane: 1,
       y: canvas.height - 150,
       jumping: false
     };
 
-    function drawPlayer() {
-      const laneX = [canvas.width/3, canvas.width/2, canvas.width*2/3];
+    const lanes = [
+      canvas.width / 3,
+      canvas.width / 2,
+      canvas.width * 2 / 3
+    ];
 
+    // =====================
+    // TRACK CONTROL (0.2s)
+    // =====================
+    let lastTrackTime = 0;
+    const TRACK_INTERVAL = 200; // ms
+
+    // =====================
+    // DRAW PLAYER
+    // =====================
+    function drawPlayer() {
       ctx.fillStyle = "lime";
       ctx.beginPath();
-      ctx.arc(laneX[player.lane], player.y, 25, 0, Math.PI * 2);
+      ctx.arc(lanes[player.lane], player.y, 25, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    // =====================
+    // GAME LOOP (60fps)
+    // =====================
     function updateGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // ground
       ctx.strokeStyle = "#444";
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, canvas.height - 100);
       ctx.lineTo(canvas.width, canvas.height - 100);
       ctx.stroke();
 
       drawPlayer();
+
       requestAnimationFrame(updateGame);
     }
 
     updateGame();
 
+    // =====================
+    // AI TRACKING (POSE)
+    // =====================
     function onResults(results) {
       if (!results.poseLandmarks) return;
+
+      const now = Date.now();
+
+      // 👉 chỉ update mỗi 0.2s
+      if (now - lastTrackTime < TRACK_INTERVAL) return;
+      lastTrackTime = now;
 
       const lm = results.poseLandmarks;
 
@@ -76,12 +128,20 @@
 
       const shoulderDiff = leftShoulder.x - rightShoulder.x;
 
-      // 👉 lane control
-      if (shoulderDiff > 0.12) player.lane = 0;
-      else if (shoulderDiff < -0.12) player.lane = 2;
-      else player.lane = 1;
+      // =====================
+      // LEFT / RIGHT CONTROL
+      // =====================
+      if (shoulderDiff > 0.12) {
+        player.lane = 0;
+      } else if (shoulderDiff < -0.12) {
+        player.lane = 2;
+      } else {
+        player.lane = 1;
+      }
 
-      // 👉 jump
+      // =====================
+      // JUMP CONTROL
+      // =====================
       if (nose.y < 0.35 && !player.jumping) {
         player.jumping = true;
         player.y -= 120;
@@ -89,11 +149,13 @@
         setTimeout(() => {
           player.y = canvas.height - 150;
           player.jumping = false;
-        }, 500);
+        }, 450);
       }
     }
 
-    // ✅ FIX: đúng constructor
+    // =====================
+    // MEDIAPIPE SETUP
+    // =====================
     const pose = new Pose({
       locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
@@ -103,15 +165,15 @@
     pose.setOptions({
       modelComplexity: 1,
       smoothLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
     });
 
     pose.onResults(onResults);
 
     const camera = new Camera(videoElement, {
       onFrame: async () => {
-        await pose.send({image: videoElement});
+        await pose.send({ image: videoElement });
       },
       width: 640,
       height: 480
