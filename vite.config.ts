@@ -14,6 +14,7 @@ export default defineConfig({
     },
   },
   build: {
+    // Adapted from https://performance.dev/how-is-linear-so-fast-a-technical-breakdown#linears-bundler-arc-parcel-rollup-vite-rolldown
     rolldownOptions: {
       output: {
         strictExecutionOrder: true,
