@@ -1,0 +1,51 @@
+{
+  "name": "bdhvs-temple-run",
+  "description": "Temple Run Lite for BDHVS26, PTNK",
+  "license": "MIT",
+  "author": "BDHVS26, HPĐ, PTNK",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "check": "biome check .",
+    "format": "biome check --write .",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource/bangers": "^5.2.8",
+    "@mediapipe/tasks-vision": "^0.10.35",
+    "lucide-react": "^1.21.0",
+    "next-themes": "^0.4.6",
+    "pixi.js": "^8.19.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-icons": "^5.6.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^26.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.9"
+  },
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
+}
