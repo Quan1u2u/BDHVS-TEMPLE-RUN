@@ -1,15 +1,15 @@
 import {
   Button,
-  CloseButton,
   Field,
   FloatingPanel,
   Grid,
-  Heading,
   HStack,
+  IconButton,
   Input,
+  Portal,
   Text,
-  VStack,
 } from '@chakra-ui/react';
+import { GripHorizontal, X } from 'lucide-react';
 import type { GameSettings } from '@/game/config';
 import { GameRuntime } from '@/game/runtime/game-runtime';
 import { confirmAction } from '@/store/confirm-action-store';
@@ -66,13 +66,14 @@ const settingFields: SettingField[] = [
 export function GameSettingsFloatingPanel() {
   const isOpen = useGameSettingsStore((state) => state.isPanelOpen);
   const isDirty = useGameSettingsStore((state) => state.isDirty);
-  const draftSettings = useGameSettingsStore((state) => state.draftSettings);
-  const updateDraftSetting = useGameSettingsStore((state) => state.updateDraftSetting);
 
   return (
     <FloatingPanel.Root
+      closeOnEscape
+      minSize={{ width: 640, height: 480 }}
+      size={{ width: 640, height: 480 }}
+      allowOverflow={false}
       defaultOpen={false}
-      ids={{ content: 'game-settings-panel', title: 'game-settings-title' }}
       open={isOpen}
       onOpenChange={({ open }) => {
         if (open) {
@@ -83,118 +84,89 @@ export function GameSettingsFloatingPanel() {
         void handleCloseRequest();
       }}
     >
-      <FloatingPanel.Positioner insetEnd={4} maxW="min(96vw, 1200px)" position="fixed" top={24}>
-        <FloatingPanel.Content
-          bg="bg.panel"
-          borderColor="border"
-          borderRadius="md"
-          borderWidth="1px"
-          w="min(96vw, 1200px)"
-        >
-          <FloatingPanel.Header px={4} py={3}>
-            <HStack justify="space-between" w="full">
-              <VStack align="start" gap={0}>
-                <Text color="fg.muted" fontFamily="mono" fontSize="xs" textTransform="uppercase">
-                  Runtime Tuning
-                </Text>
-                <FloatingPanel.Title asChild>
-                  <Heading fontFamily="heading" id="game-settings-title" size="sm">
-                    Game Settings
-                  </Heading>
-                </FloatingPanel.Title>
-              </VStack>
-              <HStack>
-                <FloatingPanel.DragTrigger asChild>
-                  <Button size="xs" variant="subtle">
-                    Drag
-                  </Button>
-                </FloatingPanel.DragTrigger>
-                <CloseButton
-                  onClick={() => {
-                    void handleCloseRequest();
-                  }}
-                  size="sm"
-                />
-              </HStack>
-            </HStack>
-          </FloatingPanel.Header>
-          <FloatingPanel.Body px={4} py={4}>
-            <Grid
-              columnGap={4}
-              maxH="70vh"
-              overflowY="auto"
-              pr={1}
-              rowGap={3}
-              templateColumns={{
-                base: '1fr',
-                lg: 'repeat(2, minmax(0, 1fr))',
-                xl: 'repeat(3, minmax(0, 1fr))',
-              }}
-            >
-              {settingFields.map((field) => (
-                <Field.Root key={field.key}>
-                  <HStack align="center" gap={3}>
-                    <Field.Label flex="0 0 12rem" mb="0">
-                      {field.label}
-                    </Field.Label>
-                    <Input
-                      bg="bg"
-                      borderColor="border"
-                      fontFamily="mono"
-                      min={field.min}
+      <Portal>
+        <FloatingPanel.Positioner>
+          <FloatingPanel.Content>
+            <FloatingPanel.Header>
+              <FloatingPanel.DragTrigger>
+                <GripHorizontal />
+                <FloatingPanel.Title>Game Settings</FloatingPanel.Title>
+              </FloatingPanel.DragTrigger>
+
+              <FloatingPanel.Control>
+                {/* We're not using CloseTrigger here, as it will trigger the internal close event before we can even intercept*/}
+                <IconButton variant="ghost" size="2xs" onClick={handleCloseRequest}>
+                  <X />
+                </IconButton>
+              </FloatingPanel.Control>
+            </FloatingPanel.Header>
+
+            <FloatingPanel.Body>
+              <Grid boxSize="full" templateRows="1fr auto">
+                <Grid overflowY="auto" gap={4} p={4} templateColumns="repeat(3, 1fr)">
+                  {settingFields.map((field) => (
+                    <SettingsInput key={field.key} field={field} />
+                  ))}
+                </Grid>
+
+                <HStack borderTopWidth={1} justify="space-between" py={4}>
+                  <Text color="fg.muted" fontSize="sm">
+                    {isDirty
+                      ? 'Unsaved changes will restart the run on save.'
+                      : 'No pending changes.'}
+                  </Text>
+
+                  <HStack h={8}>
+                    <Button
                       size="sm"
-                      step={field.step}
-                      type="number"
-                      value={draftSettings[field.key]}
-                      onChange={(event) => {
-                        updateDraftSetting(
-                          field.key,
-                          Number(event.currentTarget.value) as GameSettings[typeof field.key],
-                        );
+                      variant="outline"
+                      onClick={() => {
+                        void handleDiscardRequest();
                       }}
-                    />
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      colorPalette="blue"
+                      size="sm"
+                      onClick={() => {
+                        gameSettingsStore.getState().saveDraft();
+                        GameRuntime.applySettingsAndRestart();
+                      }}
+                    >
+                      Save
+                    </Button>
                   </HStack>
-                </Field.Root>
-              ))}
-            </Grid>
-            <HStack
-              bg="bg.panel"
-              borderTopColor="border"
-              borderTopWidth="1px"
-              justify="space-between"
-              mt={4}
-              pt={4}
-            >
-              <Text color="fg.muted" fontSize="sm">
-                {isDirty ? 'Unsaved changes will restart the run on save.' : 'No pending changes.'}
-              </Text>
-              <HStack>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    void handleDiscardRequest();
-                  }}
-                >
-                  Discard
-                </Button>
-                <Button
-                  colorPalette="blue"
-                  size="sm"
-                  onClick={() => {
-                    gameSettingsStore.getState().saveDraft();
-                    GameRuntime.applySettingsAndRestart();
-                  }}
-                >
-                  Save
-                </Button>
-              </HStack>
-            </HStack>
-          </FloatingPanel.Body>
-          <FloatingPanel.ResizeTriggers />
-        </FloatingPanel.Content>
-      </FloatingPanel.Positioner>
+                </HStack>
+              </Grid>
+            </FloatingPanel.Body>
+
+            <FloatingPanel.ResizeTriggers />
+          </FloatingPanel.Content>
+        </FloatingPanel.Positioner>
+      </Portal>
     </FloatingPanel.Root>
+  );
+}
+
+function SettingsInput({ field }: { field: SettingField }) {
+  const draftSettings = useGameSettingsStore((state) => state.draftSettings);
+  const updateDraftSetting = useGameSettingsStore((state) => state.updateDraftSetting);
+  return (
+    <Field.Root orientation="horizontal" minW={32} gap={4}>
+      <Field.Label>{field.label}</Field.Label>
+      <Input
+        fontFamily="mono"
+        min={field.min}
+        size="sm"
+        step={field.step}
+        type="number"
+        value={draftSettings[field.key]}
+        onChange={(event) => {
+          updateDraftSetting(field.key, Number(event.currentTarget.value));
+        }}
+      />
+    </Field.Root>
   );
 }
 

@@ -3,34 +3,35 @@ import { Box, Heading, Text, VStack } from '@chakra-ui/react';
 import { GamePhase } from '../game/domain/types';
 import { useGameStore } from '../store/game-store';
 
-const phaseCopy: Record<GamePhase, { title: string; body: string }> = {
+const phase: Record<GamePhase, { title: string; body: string }> = {
   [GamePhase.Boot]: {
-    title: 'Booting temple runtime',
-    body: 'Loading the canvas shell, asset bundles, and gameplay services.',
+    title: 'Đang tải game',
+    body: 'Đang tải các tài nguyên',
   },
   [GamePhase.CameraPermission]: {
-    title: 'Choose your control path',
-    body: 'Enable the webcam for MediaPipe pose controls, or start the run with keyboard fallback.',
+    title: 'Chọn cách điều khiển',
+    body: 'Bật webcam để điều khiển bằng cơ thể, hoặc dùng WASD',
   },
   [GamePhase.ModelLoading]: {
-    title: 'Loading pose model',
-    body: 'The Tasks Vision backend is warming up for real-time detection.',
+    title: 'Đang tải mô hình tư thế',
+    body: 'Đang tải MediaPipe Tasks Vision',
   },
   [GamePhase.Calibration]: {
-    title: 'Calibrating stance',
-    body: 'Stand centered with your arms relaxed while tracking locks in.',
+    title: 'Cân bằng tư thế',
+    body: 'Đứng thẳng với tay thả lỏng',
   },
   [GamePhase.Running]: {
-    title: 'Temple Run Lite',
-    body: 'Stay alive, collect coins, and keep your score climbing.',
+    // TODO: Dummy, should be hidden
+    title: '',
+    body: '',
   },
   [GamePhase.Paused]: {
-    title: 'Run paused',
-    body: "Resume when you're ready, or step back into frame to recover tracking.",
+    title: 'Đã tạm dừng',
+    body: '',
   },
   [GamePhase.GameOver]: {
     title: 'Game over',
-    body: 'Restart the run to reset score, lives, and spawn cadence.',
+    body: '',
   },
   [GamePhase.Recovery]: {
     title: 'Recovery mode',
@@ -38,26 +39,24 @@ const phaseCopy: Record<GamePhase, { title: string; body: string }> = {
   },
 };
 
-export function OverlayCopy() {
+export function GameOverlay() {
   const metrics = useGameStore((state) => state.metrics);
-  const copy = phaseCopy[metrics.phase];
+  const copy = phase[metrics.phase];
 
   return (
     <Box
-      backdropFilter="blur(14px)"
-      bg="bg/80"
-      borderColor="border"
-      borderWidth="1px"
+      borderWidth={1}
       borderRadius="md"
-      left={6}
       maxW="sm"
-      p={6}
+      p={4}
       position="absolute"
       top={6}
-      zIndex="2"
+      left={6}
+      zIndex={2}
+      bg="bg"
     >
       <VStack align="start" gap={2}>
-        <Heading color="fg" fontFamily="heading" size="md">
+        <Heading color="colorPalette.fg" size="md">
           {copy.title}
         </Heading>
         <Text color="fg.muted" fontSize="sm" lineHeight="1.7">

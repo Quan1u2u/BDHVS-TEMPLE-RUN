@@ -1,8 +1,9 @@
-import { Box, Heading, Text, VStack } from '@chakra-ui/react';
+import { Box, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useRef } from 'react';
 
 import type { PoseLandmark } from '@/game/domain/types';
 import { useGameStore } from '@/store/game-store';
+import { GameHeading } from './game-heading';
 
 const POSE_CONNECTIONS: Array<[number, number]> = [
   [11, 12],
@@ -52,32 +53,17 @@ export function WebcamPreviewPanel() {
   }, [preview.landmarks, preview.videoHeight, preview.videoWidth]);
 
   return (
-    <VStack
-      align="stretch"
-      bg="bg.panel"
-      borderColor="border"
-      borderRadius="md"
-      borderWidth="1px"
-      color="fg"
-      gap={3}
-      h="full"
-      overflow="hidden"
-      p={4}
-    >
-      <Box>
-        <Text color="fg.muted" fontFamily="mono" fontSize="xs" textTransform="uppercase">
-          CV Preview
-        </Text>
-        <Heading fontFamily="heading" size="sm">
-          Webcam + Pose Overlay
-        </Heading>
-      </Box>
+    <VStack align="stretch" gap={2} boxSize="full" overflow="hidden" p={4}>
+      <GameHeading>Webcam</GameHeading>
       <Box
         bg="bg.muted"
-        borderColor="border.muted"
+        borderColor="border"
         borderRadius="md"
-        borderWidth="1px"
-        flex="1"
+        borderStyle="dashed"
+        borderWidth={2}
+        aspectRatio="16 / 9"
+        h={40}
+        w="fit"
         overflow="hidden"
         position="relative"
       >

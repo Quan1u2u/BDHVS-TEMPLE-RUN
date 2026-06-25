@@ -1,33 +1,27 @@
-import { Button, Heading, HStack, Text, VStack } from '@chakra-ui/react';
-import { Camera, Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Button, HStack, VStack } from '@chakra-ui/react';
+import { Camera, Keyboard, Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { gameSettingsStore } from '@/store/game-settings-store';
 import { GamePhase } from '../game/domain/types';
 import { GameRuntime } from '../game/runtime/game-runtime';
 import { useGameStore } from '../store/game-store';
+import { GameHeading } from './game-heading';
 
 export function ControlPanel() {
   const phase = useGameStore((state) => state.metrics.phase);
 
   return (
-    <VStack
-      align="stretch"
-      bg="bg.panel"
-      borderColor="border"
-      borderRadius="md"
-      borderWidth="1px"
-      gap={4}
-      h="full"
-      p={5}
-    >
-      <VStack align="start" gap={1}>
-        <Text color="fg.muted" fontFamily="mono" fontSize="xs" textTransform="uppercase">
-          Gameplay Controls
-        </Text>
-        <Heading fontFamily="heading" size="sm">
-          Runner Actions
-        </Heading>
-      </VStack>
-      <HStack flexWrap="wrap" gap={3}>
+    <VStack boxSize="full" p={4} gap={2} align="start">
+      <GameHeading>Điều khiển game</GameHeading>
+
+      <HStack
+        flexWrap="wrap"
+        gap={2}
+        css={{
+          '& > button': {
+            w: 48,
+          },
+        }}
+      >
         <Button
           colorPalette="blue"
           onClick={() => {
@@ -35,19 +29,19 @@ export function ControlPanel() {
           }}
         >
           <Camera size={16} />
-          Enable Camera
+          Bật webcam
         </Button>
         <Button onClick={() => GameRuntime.startKeyboardRun()}>
-          <Play size={16} />
-          Keyboard Fallback
+          <Keyboard size={16} />
+          Chơi bằng bàn phím
         </Button>
         <Button onClick={() => GameRuntime.togglePause()}>
           {phase === GamePhase.Paused ? <Play size={16} /> : <Pause size={16} />}
-          {phase === GamePhase.Paused ? 'Resume' : 'Pause'}
+          {phase === GamePhase.Paused ? 'Tiếp tục' : 'Tạm dừng'}
         </Button>
         <Button onClick={() => GameRuntime.restart()}>
           <RotateCcw size={16} />
-          Restart
+          Khởi động lại
         </Button>
         <Button
           variant="subtle"
@@ -56,13 +50,9 @@ export function ControlPanel() {
           }}
         >
           <SlidersHorizontal size={16} />
-          Tune Runtime
+          Điều chỉnh thông số
         </Button>
       </HStack>
-      <Text color="fg.muted" fontSize="sm">
-        Use keyboard fallback while calibrating, or keep the webcam feed live to demonstrate the CV
-        control loop in real time.
-      </Text>
     </VStack>
   );
 }

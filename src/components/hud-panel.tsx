@@ -1,38 +1,43 @@
 import {
   Badge,
   Box,
+  Code,
   Flex,
   Grid,
   GridItem,
   Heading,
   HStack,
+  List,
   Progress,
   Text,
   VStack,
 } from '@chakra-ui/react';
-import { Activity, Camera, Gauge, Heart, Move3D, Trophy } from 'lucide-react';
+import { Camera, Gauge, Heart, Move3D, Notebook, Trophy } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { useGameStore } from '../store/game-store';
+import { GameHeading } from './game-heading';
 
-function MetricCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function MetricCard({
+  icon,
+  label,
+  value: content,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string | ReactNode;
+}) {
   return (
-    <GridItem bg="bg.panel" borderColor="border" borderRadius="md" borderWidth="1px" p={4}>
-      <VStack align="start" gap={2}>
+    <GridItem borderRadius="md" borderWidth={1} p={2}>
+      <VStack align="start" gap={1}>
         <HStack color="colorPalette.fg" gap={2}>
           {icon}
-          <Text
-            color="fg.muted"
-            fontFamily="mono"
-            fontSize="xs"
-            fontWeight="700"
-            textTransform="uppercase"
-          >
+          <Text color="fg.muted" fontSize="xs" fontWeight="bold" textTransform="uppercase">
             {label}
           </Text>
         </HStack>
-        <Heading color="fg" fontFamily="heading" size="lg">
-          {value}
+        <Heading size="lg" fontFamily="mono">
+          {content}
         </Heading>
       </VStack>
     </GridItem>
@@ -43,64 +48,37 @@ export function HudPanel() {
   const metrics = useGameStore((state) => state.metrics);
 
   return (
-    <VStack align="stretch" gap={4}>
+    <VStack align="stretch" boxSize="full" gap={4} p={4}>
       <Flex align="center" justify="space-between">
-        <Box>
-          <Text
-            color="fg.muted"
-            fontFamily="mono"
-            fontSize="xs"
-            fontWeight="800"
-            textTransform="uppercase"
-          >
-            Runtime Metrics
-          </Text>
-          <Heading color="fg" fontFamily="heading" size="md">
-            Temple Run Lite HUD
-          </Heading>
-        </Box>
-        <Badge colorPalette="blue" borderRadius="full" px={3} py={1} textTransform="capitalize">
-          {metrics.phase}
-        </Badge>
+        <GameHeading>Các chỉ số</GameHeading>
+        <Badge textTransform="capitalize">{metrics.phase}</Badge>
       </Flex>
 
       <Grid gap={3} templateColumns={{ base: '1fr 1fr', md: 'repeat(2, 1fr)' }}>
-        <MetricCard icon={<Trophy size={16} />} label="Score" value={metrics.score.toString()} />
+        <MetricCard icon={<Trophy size={16} />} label="ĐIỂM" value={metrics.score.toString()} />
         <MetricCard
           icon={<Gauge size={16} />}
-          label="Speed"
+          label="TỐC ĐỘ"
           value={`${metrics.speed.toFixed(2)}x`}
         />
         <MetricCard
           icon={<Move3D size={16} />}
-          label="Distance"
+          label="Khoảng cách"
           value={`${Math.floor(metrics.distance)}m`}
         />
-        <MetricCard
-          icon={<Heart size={16} />}
-          label="Lives"
-          value={'❤'.repeat(Math.max(metrics.lives, 0)) || '—'}
-        />
+        <MetricCard icon={<Heart size={16} />} label="Trái tim" value={metrics.lives.toString()} />
       </Grid>
 
-      <Box bg="bg.panel" borderColor="border" borderRadius="md" borderWidth="1px" p={4}>
+      <Box>
         <VStack align="stretch" gap={3}>
           <HStack justify="space-between">
             <HStack color="colorPalette.fg" gap={2}>
               <Camera size={16} />
-              <Text
-                color="fg.muted"
-                fontFamily="mono"
-                fontSize="xs"
-                fontWeight="700"
-                textTransform="uppercase"
-              >
-                Tracking
+              <Text color="fg.muted" fontSize="xs" fontWeight="700" textTransform="uppercase">
+                AI
               </Text>
             </HStack>
-            <Badge colorPalette="blue" textTransform="capitalize">
-              {metrics.trackingStatus}
-            </Badge>
+            <Badge textTransform="capitalize">{metrics.trackingStatus}</Badge>
           </HStack>
           <Progress.Root maxW="full" value={metrics.calibrationProgress * 100}>
             <Progress.Track bg="bg.muted" borderRadius="full">
@@ -118,23 +96,20 @@ export function HudPanel() {
         </VStack>
       </Box>
 
-      <Box bg="bg.panel" borderColor="border" borderRadius="md" borderWidth="1px" p={4}>
+      <Box>
         <HStack color="colorPalette.fg" gap={2} mb={2}>
-          <Activity size={16} />
-          <Text
-            color="fg.muted"
-            fontFamily="mono"
-            fontSize="xs"
-            fontWeight="700"
-            textTransform="uppercase"
-          >
-            Controls
+          <Notebook size={16} />
+          <Text color="fg.muted" fontSize="xs" fontWeight="700" textTransform="uppercase">
+            Hướng dẫn
           </Text>
         </HStack>
-        <Text color="fg.muted" fontSize="sm" lineHeight="1.7">
-          Use arrow keys or WASD for keyboard fallback. Raise both hands to jump, lean left to shift
-          left, and lean right to shift right when webcam tracking is active.
-        </Text>
+        <List.Root color="fg.muted" fontSize="sm" ps={4}>
+          <List.Item>
+            Dùng <Code>WASD</Code> để di chuyển bằng bàn phím
+          </List.Item>
+          <List.Item>Giơ cả hai tay lên để nhảy</List.Item>
+          <List.Item>Ngả về bên trái để sang trái, tương tự với bên phải</List.Item>
+        </List.Root>
       </Box>
     </VStack>
   );
