@@ -1,6 +1,6 @@
 export const assetBundles = {
-  boot: [{ id: 'brand-mark', src: '/favicon.svg' }],
-  gameplay: [{ id: 'tilesheet', src: '/game/tiles/tilemap_packed.png' }],
+  boot: [{ id: 'brand-mark', src: '/BDHVS-TEMPLE-RUN/favicon.svg' }],
+  gameplay: [{ id: 'tilesheet', src: '/BDHVS-TEMPLE-RUN/game/tiles/tilemap_packed.png' }],
   debug: [],
 } as const;
 

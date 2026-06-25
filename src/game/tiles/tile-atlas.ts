@@ -2,7 +2,7 @@ export const TILE_SIZE_PX = 16;
 export const TILESHEET_GAP_PX = 0;
 export const TILESHEET_COLUMNS = 12;
 export const TILESHEET_ROWS = 11;
-export const TILESHEET_PATH = '/game/tiles/tilemap_packed.png';
+export const TILESHEET_PATH = '/BDHVS-TEMPLE-RUN/game/tiles/tilemap_packed.png';
 
 /**
  * Naming convention:
