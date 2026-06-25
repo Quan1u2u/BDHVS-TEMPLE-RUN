@@ -8,8 +8,8 @@ import {
 } from './tile-atlas';
 
 describe('tile atlas', () => {
-  it('maps TILE_0 to the first slot in the sheet', () => {
-    expect(getTileFrame(TileId.TILE_0)).toEqual({
+  it('maps RED_SAND_1 to the first slot in the sheet', () => {
+    expect(getTileFrame(TileId.RED_SAND_1)).toEqual({
       x: 0,
       y: 0,
       width: TILE_SIZE_PX,
@@ -17,8 +17,8 @@ describe('tile atlas', () => {
     });
   });
 
-  it('maps TILE_12 to the first tile of the second row', () => {
-    expect(getTileFrame(TileId.TILE_12)).toEqual({
+  it('maps RED_SAND_2 to the first tile of the second row', () => {
+    expect(getTileFrame(TileId.RED_SAND_2)).toEqual({
       x: 0,
       y: TILE_SIZE_PX + TILESHEET_GAP_PX,
       width: TILE_SIZE_PX,
@@ -26,7 +26,7 @@ describe('tile atlas', () => {
     });
   });
 
-  it('uses row-major indexing up to TILE_131', () => {
+  it('uses row-major indexing up to 131th tile', () => {
     const tileNumber = 131;
     const column = tileNumber % TILESHEET_COLUMNS;
     const row = Math.floor(tileNumber / TILESHEET_COLUMNS);

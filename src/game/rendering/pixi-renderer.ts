@@ -102,12 +102,12 @@ export class PixiRenderer implements RendererPort {
     }
 
     PixiRenderer.entities.removeChildren();
-    const laneTileIds = [TileId.TILE_24, TileId.TILE_25, TileId.TILE_26];
+    const laneTileIds = [TileId.RED_SAND_3, TileId.RED_SAND_WALL_BL, TileId.RED_SAND_WALL_B];
     const tileSize = world.settings.tileScale * TILE_SIZE_PX;
 
     for (let row = 0; row < 6; row += 1) {
       for (let lane = 0; lane < 3; lane += 1) {
-        const tileId = laneTileIds[lane] ?? TileId.TILE_24;
+        const tileId = laneTileIds[lane] ?? TileId.RED_SAND_3;
         const tileSprite = createTileSprite(PixiRenderer.tileTexture, tileId, tileSize);
         tileSprite.x = laneWidth * lane + laneWidth * 0.5 - tileSize * 0.5;
         tileSprite.y = groundY - tileSize * (row + 1);
@@ -119,7 +119,7 @@ export class PixiRenderer implements RendererPort {
       const x = laneToX(obstacle.lane, laneWidth) + obstacle.x - world.player.trackPosition;
       const obstacleTile = createTileSprite(
         PixiRenderer.tileTexture,
-        obstacle.type === ObstacleType.FireTrap ? TileId.TILE_66 : TileId.TILE_78,
+        obstacle.type === ObstacleType.FireTrap ? TileId.OBSTACLE_5 : TileId.TILE_78,
         tileSize * 1.4,
       );
       obstacleTile.x = x - obstacleTile.width * 0.5;
@@ -129,7 +129,7 @@ export class PixiRenderer implements RendererPort {
 
     for (const collectible of world.collectibles) {
       const x = laneToX(collectible.lane, laneWidth) + collectible.x - world.player.trackPosition;
-      const collectibleTile = createTileSprite(PixiRenderer.tileTexture, TileId.TILE_58, tileSize);
+      const collectibleTile = createTileSprite(PixiRenderer.tileTexture, TileId.BORDER_C, tileSize);
       collectibleTile.x = x - collectibleTile.width * 0.5;
       collectibleTile.y = groundY - 110;
       PixiRenderer.entities.addChild(collectibleTile);
