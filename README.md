@@ -54,9 +54,9 @@ const obstacleScoreDelta: Record<ObstacleType, number>
 
 That table is the canonical award/punishment layer for obstacle collisions. The runtime consumes the LUT rather than scattering score penalties across switch statements.
 
-### Assets use a manifest pipeline even though v1 is placeholder-heavy
+### Assets use a manifest pipeline
 
-The current build leans on programmatic Pixi rendering and lightweight placeholder assets. Even so, the repo already includes a typed bundle-oriented asset pipeline so real art and audio can be introduced later without changing runtime boundaries.
+The setup is rock-solid and ready for customizations, as everything is split down as engines or similar patterns for both bundle efficiency, ease of maintenance, and easy future optimization (if needed).
 
 ## Project layout
 
@@ -82,7 +82,7 @@ The current build leans on programmatic Pixi rendering and lightweight placehold
 
 ```bash
 pnpm install
-# should note that this only works for the React-side of things.
+# should note that this only works for the React side of things.
 # to test the game logic, it's required to use the production build.
 pnpm dev 
 ```
