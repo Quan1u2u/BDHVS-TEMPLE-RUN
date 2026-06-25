@@ -1,6 +1,10 @@
-import { Box, Center, Grid, Heading, HStack, Image, Separator } from '@chakra-ui/react';
+import { Box, Grid, Heading, HStack, Image, Separator } from '@chakra-ui/react';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { GameOverDialog } from '@/components/game-over-dialog';
+import { GameOverlay } from '@/components/game-overlay';
+import { GameViewport } from '@/components/game-viewport';
+import { IdleOverlay } from '@/components/idle-overlay';
 import { ControlPanel } from '../components/control-panel';
 import { GameSettingsFloatingPanel } from '../components/game-settings-floating-panel';
 import { HudPanel } from '../components/hud-panel';
@@ -20,11 +24,11 @@ export function App() {
           </HStack>
           <Separator w="full" />
           {/* TODO: Fix the game */}
-          {/*<Container position="relative" boxSize="full">
+          <Box position="relative" boxSize="full">
             <GameViewport />
+            <IdleOverlay />
             <GameOverlay />
-          </Container>*/}
-          <Center>Game viewport</Center>
+          </Box>
         </Grid>
 
         <Separator orientation="vertical" h="full" />
@@ -40,6 +44,7 @@ export function App() {
 
       <GameSettingsFloatingPanel />
       <ConfirmDialog />
+      <GameOverDialog />
     </Box>
   );
 }

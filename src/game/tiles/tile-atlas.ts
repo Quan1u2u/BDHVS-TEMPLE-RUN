@@ -1,5 +1,5 @@
 export const TILE_SIZE_PX = 16;
-export const TILESHEET_GAP_PX = 1;
+export const TILESHEET_GAP_PX = 0;
 export const TILESHEET_COLUMNS = 12;
 export const TILESHEET_ROWS = 11;
 export const TILESHEET_PATH = '/game/tiles/tilemap_packed.png';
@@ -59,19 +59,19 @@ export enum TileId {
   STONE_STRAIGHT = 39,
   FLOOR_STONE = 40, // for blocking ways
   OBSTACLE_1 = 41,
-  FLOOR_1 = 42,
+  TILE_42 = 42,
   WALL_DECOR_3_B_ALT = 43,
   WALL_DECOR_4_B_ALT = 44,
   DOOR_1_CLOSED = 45,
   DOOR_L_CLOSED = 46,
   DOOR_2_CLOSED = 47,
 
-  FLOOR_2 = 48,
-  FLOOR_3 = 49,
-  FLOOR_4 = 50,
-  FLOOR_5 = 51,
-  FLOOR_6 = 52,
-  FLOOR_7 = 53,
+  FLOOR = 48,
+  TILE_49 = 49,
+  TILE_50 = 50,
+  TILE_51 = 51,
+  TILE_52 = 52,
+  TILE_53 = 53,
   TILE_54 = 54,
   TILE_55 = 55,
   TILE_56 = 56,

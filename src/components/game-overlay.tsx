@@ -1,4 +1,4 @@
-import { Box, Heading, Text, VStack } from '@chakra-ui/react';
+import { Box, Heading, Show, Text, VStack } from '@chakra-ui/react';
 
 import { GamePhase } from '../game/domain/types';
 import { useGameStore } from '../store/game-store';
@@ -41,51 +41,59 @@ const phase: Record<GamePhase, { title: string; body: string }> = {
 
 export function GameOverlay() {
   const metrics = useGameStore((state) => state.metrics);
+  const isRunning = useGameStore((state) => state.metrics.phase === GamePhase.Running);
   const copy = phase[metrics.phase];
+  const shouldShowCopy = copy.title.length > 0 || copy.body.length > 0;
 
   return (
-    <Box
-      borderWidth={1}
-      borderRadius="md"
-      maxW="sm"
-      p={4}
-      position="absolute"
-      top={6}
-      left={6}
-      zIndex={2}
-      bg="bg"
-    >
-      <VStack align="start" gap={2}>
-        <Heading color="colorPalette.fg" size="md">
-          {copy.title}
-        </Heading>
-        <Text color="fg.muted" fontSize="sm" lineHeight="1.7">
-          {copy.body}
-        </Text>
-        {metrics.phase === GamePhase.Boot ? (
-          <Box w="full">
-            <Text color="fg.muted" fontFamily="mono" fontSize="xs" textTransform="uppercase">
-              {metrics.bootStage}
-            </Text>
-            <Box
-              bg="bg.muted"
-              borderColor="border"
-              borderRadius="md"
-              borderWidth="1px"
-              h={2}
-              mt={2}
-              overflow="hidden"
-              w="full"
-            >
+    <Show when={!isRunning}>
+      <Box
+        borderWidth={1}
+        borderRadius="md"
+        maxW="sm"
+        p={4}
+        position="absolute"
+        top={6}
+        left={6}
+        zIndex={2}
+        bg="bg"
+      >
+        <VStack align="start" gap={2}>
+          {shouldShowCopy ? (
+            <>
+              <Heading color="colorPalette.fg" size="md">
+                {copy.title}
+              </Heading>
+              <Text color="fg.muted" fontSize="sm" lineHeight="1.7">
+                {copy.body}
+              </Text>
+            </>
+          ) : null}
+          {metrics.phase === GamePhase.Boot ? (
+            <Box w="full">
+              <Text color="fg.muted" fontFamily="mono" fontSize="xs" textTransform="uppercase">
+                {metrics.bootStage}
+              </Text>
               <Box
-                bg="colorPalette.solid"
-                h="full"
-                w={`${Math.round(metrics.bootProgress * 100)}%`}
-              />
+                bg="bg.muted"
+                borderColor="border"
+                borderRadius="md"
+                borderWidth="1px"
+                h={2}
+                mt={2}
+                overflow="hidden"
+                w="full"
+              >
+                <Box
+                  bg="colorPalette.solid"
+                  h="full"
+                  w={`${Math.round(metrics.bootProgress * 100)}%`}
+                />
+              </Box>
             </Box>
-          </Box>
-        ) : null}
-      </VStack>
-    </Box>
+          ) : null}
+        </VStack>
+      </Box>
+    </Show>
   );
 }

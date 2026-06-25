@@ -75,12 +75,14 @@ describe('createMetricsSink', () => {
 
     sink.publishRenderState({
       playerLane: Lane.Center,
-      playerProgress: 1,
+      boardScrollOffsetRows: 1.25,
+      unitsPerBoardRow: 72,
+      blockedRows: [{ id: 'blocker-1', trackOffset: 180, blockedColumns: [1, 2] }],
       obstacles: [
         {
           id: 'obstacle-1',
           lane: Lane.Left,
-          progress: 0.25,
+          trackOffset: 180,
           type: ObstacleType.Virus,
         },
       ],
@@ -88,7 +90,7 @@ describe('createMetricsSink', () => {
         {
           id: 'collectible-1',
           lane: Lane.Right,
-          progress: 0.5,
+          trackOffset: 120,
           type: CollectibleType.Cloud,
         },
       ],
@@ -97,7 +99,9 @@ describe('createMetricsSink', () => {
 
     const state = gameStore.getState();
     expect(state.render.playerLane).toBe(Lane.Center);
-    expect(state.render.playerProgress).toBe(1);
+    expect(state.render.boardScrollOffsetRows).toBe(1.25);
+    expect(state.render.unitsPerBoardRow).toBe(72);
+    expect(state.render.blockedRows).toHaveLength(1);
     expect(state.render.obstacles).toHaveLength(1);
     expect(state.render.collectibles[0]?.type).toBe(CollectibleType.Cloud);
     expect(state.render.renderError).toBe('Tilesheet unavailable');
@@ -107,12 +111,14 @@ describe('createMetricsSink', () => {
     const sink = createMetricsSink();
     const snapshot: GameRenderSnapshot = {
       playerLane: Lane.Right,
-      playerProgress: 1,
+      boardScrollOffsetRows: 2.5,
+      unitsPerBoardRow: 72,
+      blockedRows: [{ id: 'blocker-1', trackOffset: 96, blockedColumns: [2] }],
       obstacles: [
         {
           id: 'obstacle-1',
           lane: Lane.Center,
-          progress: 0.75,
+          trackOffset: 72,
           type: ObstacleType.Hacker,
         },
       ],
@@ -120,7 +126,7 @@ describe('createMetricsSink', () => {
         {
           id: 'collectible-1',
           lane: Lane.Left,
-          progress: 0.5,
+          trackOffset: 144,
           type: CollectibleType.AI,
         },
       ],

@@ -7,9 +7,9 @@ describe('board tiles', () => {
   it('builds a five-column row with border tiles on the outside', () => {
     expect(buildBoardRowTiles(0)).toEqual([
       TileId.BORDER_L,
-      TileId.FLOOR_2,
-      TileId.FLOOR_4,
-      TileId.FLOOR_6,
+      TileId.FLOOR,
+      TileId.FLOOR,
+      TileId.FLOOR,
       TileId.BORDER_R,
     ]);
   });

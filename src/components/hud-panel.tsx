@@ -88,7 +88,13 @@ export function HudPanel() {
           <Text color="fg.muted" fontSize="sm">
             {metrics.debugMessage}
           </Text>
-          <HStack color="fg.muted" fontSize="sm" justify="space-between">
+          <HStack
+            color="fg.muted"
+            fontSize="sm"
+            justify="space-between"
+            fontFamily="mono"
+            fontVariant="tabular-nums"
+          >
             <Text>Pose: {metrics.poseCommand}</Text>
             <Text>Lane: {metrics.lane}</Text>
             <Text>{metrics.fps} FPS</Text>
@@ -105,7 +111,7 @@ export function HudPanel() {
         </HStack>
         <List.Root color="fg.muted" fontSize="sm" ps={4}>
           <List.Item>
-            Dùng <Code>WASD</Code> để di chuyển bằng bàn phím
+            Dùng <Code>WASD</Code> hoặc các phím mũi tên để di chuyển bằng bàn phím
           </List.Item>
           <List.Item>Giơ cả hai tay lên để nhảy</List.Item>
           <List.Item>Ngả về bên trái để sang trái, tương tự với bên phải</List.Item>

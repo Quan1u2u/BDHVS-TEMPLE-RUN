@@ -41,10 +41,10 @@ describe('game settings store', () => {
   it('keeps draft changes separate until save', () => {
     const store = createSettingsStore();
 
-    store.getState().updateDraftSetting('jumpVelocity', 900);
+    store.getState().updateDraftSetting('laneSnapSpeed', 12);
 
-    expect(store.getState().draftSettings.jumpVelocity).toBe(900);
-    expect(store.getState().appliedSettings.jumpVelocity).toBe(defaultGameSettings.jumpVelocity);
+    expect(store.getState().draftSettings.laneSnapSpeed).toBe(12);
+    expect(store.getState().appliedSettings.laneSnapSpeed).toBe(defaultGameSettings.laneSnapSpeed);
   });
 
   it('persists applied settings to localStorage on save', () => {

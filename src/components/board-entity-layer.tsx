@@ -2,7 +2,7 @@ import type { Texture } from 'pixi.js';
 import { useMemo } from 'react';
 
 import { CollectibleType, ObstacleType } from '../game/domain/types';
-import { laneToBoardColumn, progressToBoardRow } from '../game/rendering/grid-layout';
+import { laneToBoardColumn, trackOffsetToBoardY } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
 import type { GameRenderSnapshot } from '../store/game-store';
@@ -25,7 +25,7 @@ export function BoardEntityLayer({
 
     for (const obstacle of render.obstacles) {
       const column = laneToBoardColumn(obstacle.lane);
-      const row = progressToBoardRow(obstacle.progress, visibleRows);
+      const row = trackOffsetToBoardY(obstacle.trackOffset, visibleRows, render.unitsPerBoardRow);
       nextSprites.push(
         <pixiSprite
           key={obstacle.id}
@@ -34,13 +34,18 @@ export function BoardEntityLayer({
           y={row * tileSize}
           width={tileSize}
           height={tileSize}
+          cullable
         />,
       );
     }
 
     for (const collectible of render.collectibles) {
       const column = laneToBoardColumn(collectible.lane);
-      const row = progressToBoardRow(collectible.progress, visibleRows);
+      const row = trackOffsetToBoardY(
+        collectible.trackOffset,
+        visibleRows,
+        render.unitsPerBoardRow,
+      );
       nextSprites.push(
         <pixiSprite
           key={collectible.id}
@@ -49,6 +54,7 @@ export function BoardEntityLayer({
           y={row * tileSize}
           width={tileSize}
           height={tileSize}
+          cullable
         />,
       );
     }
@@ -56,7 +62,7 @@ export function BoardEntityLayer({
     return nextSprites;
   }, [render, tileSize, tileTexture, visibleRows]);
 
-  return <pixiContainer>{sprites}</pixiContainer>;
+  return <pixiContainer cullableChildren>{sprites}</pixiContainer>;
 }
 
 function obstacleTileId(obstacleType: ObstacleType): TileId {

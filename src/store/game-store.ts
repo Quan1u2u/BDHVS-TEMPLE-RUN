@@ -44,9 +44,11 @@ export interface GameStoreState {
 
 export interface GameRenderSnapshot {
   playerLane: Lane;
-  playerProgress: number;
-  obstacles: Array<{ id: string; lane: Lane; progress: number; type: ObstacleType }>;
-  collectibles: Array<{ id: string; lane: Lane; progress: number; type: CollectibleType }>;
+  boardScrollOffsetRows: number;
+  unitsPerBoardRow: number;
+  blockedRows: Array<{ id: string; trackOffset: number; blockedColumns: number[] }>;
+  obstacles: Array<{ id: string; lane: Lane; trackOffset: number; type: ObstacleType }>;
+  collectibles: Array<{ id: string; lane: Lane; trackOffset: number; type: CollectibleType }>;
   renderError: string | null;
 }
 
@@ -69,7 +71,9 @@ export const defaultMetrics: GameMetricsSnapshot = {
 
 export const defaultRenderSnapshot: GameRenderSnapshot = {
   playerLane: Lane.Center,
-  playerProgress: 1,
+  boardScrollOffsetRows: 0,
+  unitsPerBoardRow: 72,
+  blockedRows: [],
   obstacles: [],
   collectibles: [],
   renderError: null,

@@ -11,6 +11,7 @@ export function GameViewport() {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const metricsSink = useMemo(() => createMetricsSink(), []);
   const render = useGameStore((state) => state.render);
+  const phase = useGameStore((state) => state.metrics.phase);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -59,20 +60,14 @@ export function GameViewport() {
     <Box
       ref={hostRef}
       aria-label="Temple Run Lite gameplay viewport"
-      bg="bg.panel"
-      borderColor="border"
-      borderRadius="md"
-      borderWidth="1px"
-      h="full"
-      minH={{ base: '360px', xl: '100%' }}
+      boxSize="full"
       overflow="hidden"
-      position="relative"
-      boxShadow="lg"
     >
       {size.width > 0 && size.height > 0 && tileSize > 0 && visibleRows > 0 ? (
         <GameStageScene
           width={size.width}
           height={size.height}
+          phase={phase}
           render={render}
           tileSize={tileSize}
           visibleRows={visibleRows}

@@ -1,4 +1,6 @@
+import { toaster } from '@/components/ui/toaster';
 import { soundEngine } from '@/sound-engine';
+import { openGameOverDialog } from '@/store/game-over-store';
 import { getAppliedGameSettings } from '@/store/game-settings-store';
 import { gameStore } from '@/store/game-store';
 import type { MetricsSink } from '../../store/game-store-bridge';
@@ -135,6 +137,8 @@ export class GameRuntime {
       return;
     }
 
+    await soundEngine.unlockAudio();
+
     if (!GameRuntime.context.poseProvider) {
       GameRuntime.context.poseProvider = new MediaPipePoseProvider();
     }
@@ -167,19 +171,39 @@ export class GameRuntime {
 
     if (!GameRuntime.context.world.cameraEnabled) {
       GameRuntime.context.world.debugMessage = 'Camera unavailable; keyboard fallback active';
-      GameRuntime.startKeyboardRun();
+      void GameRuntime.startKeyboardRun();
     }
   }
 
-  public static startKeyboardRun(): void {
+  public static async recalibrateTracking(): Promise<void> {
     if (!GameRuntime.context) {
       return;
     }
 
+    GameRuntime.context.pendingAction = PlayerAction.None;
+    GameRuntime.context.world.phase = GamePhase.Calibration;
+    GameRuntime.context.world.debugMessage = 'Recalibrating pose tracking';
+    GameRuntime.publishMetrics();
+
+    await GameRuntime.context.poseProvider?.stop();
+    GameRuntime.context.poseProvider = new MediaPipePoseProvider();
+    await GameRuntime.enableCameraTracking();
+  }
+
+  public static async startKeyboardRun(): Promise<void> {
+    if (!GameRuntime.context) {
+      return;
+    }
+
+    await soundEngine.unlockAudio();
     GameRuntime.context.world.phase = GamePhase.Running;
     GameRuntime.context.world.debugMessage = 'Keyboard fallback active';
-    void soundEngine.resume();
-    GameRuntime.ensureBackgroundMusic();
+    await soundEngine.resume();
+    if (soundEngine.isBackgroundMusicPaused()) {
+      await soundEngine.resumeBackgroundMusic();
+    } else {
+      GameRuntime.ensureBackgroundMusic();
+    }
     GameRuntime.publishMetrics();
   }
 
@@ -193,9 +217,15 @@ export class GameRuntime {
       return;
     }
 
-    world.phase = world.phase === GamePhase.Paused ? GamePhase.Running : GamePhase.Paused;
-    world.debugMessage =
-      world.phase === GamePhase.Running ? 'Back on the run' : 'Simulation paused';
+    const nextPhase = world.phase === GamePhase.Paused ? GamePhase.Running : GamePhase.Paused;
+    world.phase = nextPhase;
+    world.debugMessage = nextPhase === GamePhase.Running ? 'Back on the run' : 'Simulation paused';
+
+    if (nextPhase === GamePhase.Paused) {
+      soundEngine.pauseBackgroundMusic();
+    } else {
+      void soundEngine.resumeBackgroundMusic();
+    }
     GameRuntime.publishMetrics();
   }
 
@@ -239,26 +269,49 @@ export class GameRuntime {
     GameRuntime.context.lastFrameAt = now;
     GameRuntime.context.world.fps = Math.round(1000 / Math.max(1, deltaMs));
 
+    const previousPhase = GameRuntime.context.world.phase;
+
     if (GameRuntime.context.world.phase === GamePhase.Running) {
-      const previousLives = GameRuntime.context.world.lives;
       stepWorld(GameRuntime.context.world, {
         deltaMs,
         action: GameRuntime.context.pendingAction,
+        mode: 'active',
       });
 
-      if (GameRuntime.context.world.lives < previousLives) {
-        if (GameRuntime.context.world.lives <= 0) {
-          soundEngine.playBonk();
-        } else {
-          soundEngine.playSfx();
-        }
+      if (GameRuntime.context.world.lastCollectedItem) {
+        const { type, scoreDelta } = GameRuntime.context.world.lastCollectedItem;
+        soundEngine.playSfx();
+        toaster.create({
+          title: 'Nhận vật phẩm',
+          description: `${collectibleLabel(type)} (+${scoreDelta})`,
+          type: 'success',
+          closable: true,
+        });
+      }
+
+      if (GameRuntime.context.world.lastHitObstacle) {
+        const { type, scoreDelta } = GameRuntime.context.world.lastHitObstacle;
+        soundEngine.playBonk();
+        toaster.create({
+          title: 'Cản trở nguy hiểm',
+          description: `${obstacleLabel(type)} (${scoreDelta}), bạn còn ${GameRuntime.context.world.lives} trái tim`,
+          type: 'error',
+          closable: true,
+        });
       }
     }
 
     GameRuntime.context.pendingAction = PlayerAction.None;
 
-    if (GameRuntime.context.world.phase === GamePhase.GameOver) {
+    if (
+      previousPhase !== GamePhase.GameOver &&
+      GameRuntime.context.world.phase === GamePhase.GameOver
+    ) {
       GameRuntime.context.world.debugMessage = 'Game over';
+      if (soundEngine.isBackgroundMusicPlaying()) {
+        soundEngine.stopBackgroundMusic();
+      }
+      openGameOverDialog(GameRuntime.context.world.score);
     }
 
     GameRuntime.publishMetrics();
@@ -273,11 +326,12 @@ export class GameRuntime {
     }
 
     const { world } = GameRuntime.context;
+    const speedFactor = world.speed / Math.max(world.settings.baseRunSpeed, 1);
     const renderError = gameStore.getState().render.renderError;
     GameRuntime.context.metricsSink.publish({
       score: world.score,
       distance: world.distance,
-      speed: Number((world.speed / 260).toFixed(2)),
+      speed: Number(speedFactor.toFixed(2)),
       lives: world.lives,
       lane: Math.round(world.player.currentLane) as Lane,
       phase: world.phase,
@@ -292,17 +346,23 @@ export class GameRuntime {
     });
     GameRuntime.context.metricsSink.publishRenderState({
       playerLane: Math.round(world.player.currentLane) as Lane,
-      playerProgress: 1,
+      boardScrollOffsetRows: world.distance / Math.max(1, world.settings.obstacleWidth),
+      unitsPerBoardRow: world.settings.obstacleWidth,
+      blockedRows: world.blockedRows.map((blockedRow) => ({
+        id: blockedRow.id,
+        trackOffset: blockedRow.x - world.player.trackPosition,
+        blockedColumns: blockedRow.blockedColumns,
+      })),
       obstacles: world.obstacles.map((obstacle) => ({
         id: obstacle.id,
         lane: obstacle.lane,
-        progress: obstacle.progress,
+        trackOffset: obstacle.x - world.player.trackPosition,
         type: obstacle.type,
       })),
       collectibles: world.collectibles.map((collectible) => ({
         id: collectible.id,
         lane: collectible.lane,
-        progress: collectible.progress,
+        trackOffset: collectible.x - world.player.trackPosition,
         type: collectible.type,
       })),
       renderError,
@@ -391,18 +451,12 @@ export class GameRuntime {
         case 'D':
           GameRuntime.context.pendingAction = PlayerAction.MoveRight;
           break;
-        case 'ArrowUp':
-        case ' ':
-        case 'w':
-        case 'W':
-          GameRuntime.context.pendingAction = PlayerAction.Jump;
-          break;
         default:
           return;
       }
 
       if (GameRuntime.context.world.phase === GamePhase.CameraPermission) {
-        GameRuntime.startKeyboardRun();
+        void GameRuntime.startKeyboardRun();
       }
     };
 
@@ -417,6 +471,42 @@ export class GameRuntime {
   }
 }
 
+function collectibleLabel(type: string): string {
+  switch (type) {
+    case 'ai':
+      return 'AI';
+    case 'cloud':
+      return 'Cloud';
+    case 'stem':
+      return 'STEM';
+    case 'digital-citizen':
+      return 'Digital Citizen';
+    case 'e-learning':
+      return 'E-Learning';
+    default:
+      return type;
+  }
+}
+
+function obstacleLabel(type: string): string {
+  switch (type) {
+    case 'virus':
+      return 'Virus';
+    case 'hacker':
+      return 'Hacker';
+    case 'scam':
+      return 'Scam';
+    case 'fake-news':
+      return 'Fake News';
+    case 'cyberbullying':
+      return 'Cyberbullying';
+    case 'blocked-lane':
+      return 'Đường bị chặn';
+    default:
+      return type;
+  }
+}
+
 function mapPoseCommandToAction(command: PoseCommand): PlayerAction {
   switch (command) {
     case PoseCommand.MoveLeft:
@@ -424,7 +514,7 @@ function mapPoseCommandToAction(command: PoseCommand): PlayerAction {
     case PoseCommand.MoveRight:
       return PlayerAction.MoveRight;
     case PoseCommand.Jump:
-      return PlayerAction.Jump;
+      return PlayerAction.None;
     case PoseCommand.Idle:
       return PlayerAction.None;
   }

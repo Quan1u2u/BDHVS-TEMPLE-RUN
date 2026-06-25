@@ -1,7 +1,15 @@
 import { Application, extend } from '@pixi/react';
-import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import {
+  Assets,
+  Container,
+  CullerPlugin,
+  extensions,
+  Sprite,
+  Texture,
+  TextureStyle,
+} from 'pixi.js';
 import { useEffect, useState } from 'react';
-
+import { GamePhase } from '../game/domain/types';
 import { TILESHEET_PATH } from '../game/tiles/tile-atlas';
 import type { GameRenderSnapshot } from '../store/game-store';
 import { gameStore } from '../store/game-store';
@@ -9,14 +17,17 @@ import { BoardEntityLayer } from './board-entity-layer';
 import { BoardFloorLayer } from './board-floor-layer';
 import { PlayerLayer } from './player-layer';
 
+TextureStyle.defaultOptions.scaleMode = 'nearest';
+extensions.add(CullerPlugin);
+
 extend({
   Container,
-  Graphics,
   Sprite,
 });
 
 interface GameStageSceneProps {
   height: number;
+  phase: GamePhase;
   render: GameRenderSnapshot;
   tileSize: number;
   visibleRows: number;
@@ -25,6 +36,7 @@ interface GameStageSceneProps {
 
 export function GameStageScene({
   height,
+  phase,
   render,
   tileSize,
   visibleRows,
@@ -57,11 +69,20 @@ export function GameStageScene({
   }, []);
 
   return (
-    <Application width={width} height={height} background={'#0a0f17'} antialias>
-      <pixiContainer>
-        {tileTexture ? (
+    <Application
+      width={width}
+      height={height}
+      background="black"
+      antialias
+      preference="webgpu"
+      roundPixels
+      sharedTicker={false}
+    >
+      <pixiContainer cullableChildren>
+        {tileTexture && phase !== GamePhase.CameraPermission && phase !== GamePhase.GameOver ? (
           <>
             <BoardFloorLayer
+              render={render}
               tileSize={tileSize}
               tileTexture={tileTexture}
               visibleRows={visibleRows}
@@ -74,7 +95,13 @@ export function GameStageScene({
             />
           </>
         ) : null}
-        <PlayerLayer render={render} tileSize={tileSize} visibleRows={visibleRows} />
+        <PlayerLayer
+          phase={phase}
+          render={render}
+          tileSize={tileSize}
+          tileTexture={tileTexture}
+          visibleRows={visibleRows}
+        />
       </pixiContainer>
     </Application>
   );

@@ -1,5 +1,13 @@
 import { Button, HStack, VStack } from '@chakra-ui/react';
-import { Camera, Keyboard, Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import {
+  Camera,
+  Keyboard,
+  Pause,
+  Play,
+  RefreshCcw,
+  RotateCcw,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { gameSettingsStore } from '@/store/game-settings-store';
 import { GamePhase } from '../game/domain/types';
 import { GameRuntime } from '../game/runtime/game-runtime';
@@ -31,7 +39,20 @@ export function ControlPanel() {
           <Camera size={16} />
           Bật webcam
         </Button>
-        <Button onClick={() => GameRuntime.startKeyboardRun()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            void GameRuntime.recalibrateTracking();
+          }}
+        >
+          <RefreshCcw size={16} />
+          Recalibrate AI
+        </Button>
+        <Button
+          onClick={() => {
+            void GameRuntime.startKeyboardRun();
+          }}
+        >
           <Keyboard size={16} />
           Chơi bằng bàn phím
         </Button>

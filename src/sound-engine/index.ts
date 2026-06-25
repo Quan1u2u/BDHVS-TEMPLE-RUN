@@ -14,15 +14,17 @@ export const RANDOM_SFX_FILES = [
 ] as const;
 export const SFX_FILES = [...RANDOM_SFX_FILES, BONK_SFX_FILE] as const;
 
-class SoundEngine {
+export class SoundEngine {
   private ctx: AudioContext | null = null;
   private buffers = new Map<string, AudioBuffer>();
+  private encodedAudio = new Map<string, ArrayBuffer>();
   private bgSource: AudioBufferSourceNode | null = null;
   private bgGain: GainNode | null = null;
   private bgIndex: number = 0;
   private pendingBgIndex: number | null = null;
   private backgroundMusicVolume = 0.24;
   private sfxVolume = 0.62;
+  private isMusicPaused = false;
 
   private getContext(): AudioContext {
     if (!this.ctx) {
@@ -32,28 +34,46 @@ class SoundEngine {
     return this.ctx;
   }
 
-  private async loadToBuffer(url: string, key: string): Promise<void> {
+  private async preloadEncodedAudio(url: string, key: string): Promise<void> {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to load audio: ${url}`);
     const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await this.getContext().decodeAudioData(arrayBuffer);
-    this.buffers.set(key, audioBuffer);
+    this.encodedAudio.set(key, arrayBuffer);
   }
 
   async preloadBackgroundMusic(): Promise<void> {
     await Promise.all(
       BACKGROUND_MUSIC_FILES.map((f) =>
-        this.loadToBuffer(`/game/sound/background/${f}`, `bg:${f}`),
+        this.preloadEncodedAudio(`/game/sound/background/${f}`, `bg:${f}`),
       ),
     );
+  }
+
+  async preloadSfx(): Promise<void> {
+    await Promise.all(
+      SFX_FILES.map((f) => this.preloadEncodedAudio(`/game/sound/sfx/${f}`, `sfx:${f}`)),
+    );
+  }
+
+  async unlockAudio(): Promise<void> {
+    const ctx = this.getContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
+    for (const [key, encodedAudio] of this.encodedAudio.entries()) {
+      if (this.buffers.has(key)) {
+        continue;
+      }
+
+      const audioBuffer = await ctx.decodeAudioData(encodedAudio.slice(0));
+      this.buffers.set(key, audioBuffer);
+    }
+
     if (this.pendingBgIndex !== null) {
       this.startBackgroundMusic(this.pendingBgIndex);
       this.pendingBgIndex = null;
     }
-  }
-
-  async preloadSfx(): Promise<void> {
-    await Promise.all(SFX_FILES.map((f) => this.loadToBuffer(`/game/sound/sfx/${f}`, `sfx:${f}`)));
   }
 
   private playBuffer(key: string): void {
@@ -83,6 +103,10 @@ class SoundEngine {
 
   isBackgroundMusicPlaying(): boolean {
     return this.bgSource !== null;
+  }
+
+  isBackgroundMusicPaused(): boolean {
+    return this.isMusicPaused;
   }
 
   // React StrictMode calls effects twice in dev, so bgIndex advances by 2 per mount
@@ -116,9 +140,9 @@ class SoundEngine {
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.loop = false;
+    source.loop = BACKGROUND_MUSIC_FILES.length === 1;
     source.onended = () => {
-      if (this.bgSource === source) {
+      if (!source.loop && this.bgSource === source) {
         this.playBackgroundMusic();
       }
     };
@@ -131,7 +155,7 @@ class SoundEngine {
     );
 
     source.connect(gain).connect(ctx.destination);
-    source.start();
+    source.start(ctx.currentTime);
 
     this.bgSource = source;
     this.bgGain = gain;
@@ -139,6 +163,7 @@ class SoundEngine {
 
   stopBackgroundMusic(): void {
     this.pendingBgIndex = null;
+    this.isMusicPaused = false;
     if (this.bgSource && this.bgGain) {
       const ctx = this.getContext();
       this.bgGain.gain.setValueAtTime(this.bgGain.gain.value, ctx.currentTime);
@@ -156,10 +181,36 @@ class SoundEngine {
     }
   }
 
-  async resume(): Promise<void> {
-    if (this.ctx?.state === 'suspended') {
-      await this.ctx.resume();
+  pauseBackgroundMusic(): void {
+    if (!this.bgGain || !this.ctx || this.isMusicPaused) {
+      return;
     }
+
+    this.bgGain.gain.setValueAtTime(this.bgGain.gain.value, this.ctx.currentTime);
+    this.bgGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + STOP_FADE_MS / 1000);
+    this.isMusicPaused = true;
+
+    setTimeout(() => {
+      void this.ctx?.suspend();
+    }, STOP_FADE_MS);
+  }
+
+  async resumeBackgroundMusic(): Promise<void> {
+    if (!this.bgGain || !this.ctx || !this.isMusicPaused) {
+      return;
+    }
+
+    await this.ctx.resume();
+    this.bgGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.bgGain.gain.linearRampToValueAtTime(
+      this.backgroundMusicVolume,
+      this.ctx.currentTime + STOP_FADE_MS / 1000,
+    );
+    this.isMusicPaused = false;
+  }
+
+  async resume(): Promise<void> {
+    await this.unlockAudio();
   }
 
   applyMix(volumes: { backgroundMusicVolume: number; sfxVolume: number }): void {

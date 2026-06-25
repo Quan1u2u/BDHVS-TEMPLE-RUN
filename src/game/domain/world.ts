@@ -13,9 +13,6 @@ export interface PlayerState {
   currentLane: Lane;
   targetLane: Lane;
   trackPosition: number;
-  jumpHeight: number;
-  jumpVelocity: number;
-  isJumping: boolean;
 }
 
 export interface ObstacleState {
@@ -27,6 +24,24 @@ export interface ObstacleState {
   height: number;
   scoreDelta: number;
   progress: number;
+}
+
+export interface BlockedRowState {
+  id: string;
+  blockedColumns: number[];
+  x: number;
+  width: number;
+  progress: number;
+}
+
+export interface CollectedItemEvent {
+  type: CollectibleType;
+  scoreDelta: number;
+}
+
+export interface ObstacleHitEvent {
+  type: ObstacleType | 'blocked-lane';
+  scoreDelta: number;
 }
 
 export interface CollectibleState {
@@ -50,6 +65,9 @@ export interface WorldRuntimeState {
   player: PlayerState;
   obstacles: ObstacleState[];
   collectibles: CollectibleState[];
+  blockedRows: BlockedRowState[];
+  lastCollectedItem: CollectedItemEvent | null;
+  lastHitObstacle: ObstacleHitEvent | null;
   poseCommand: PoseCommand;
   trackingStatus: TrackingStatus;
   calibrationProgress: number;
@@ -59,4 +77,5 @@ export interface WorldRuntimeState {
   elapsedMs: number;
   obstacleSpawnCooldownMs: number;
   collectibleSpawnCooldownMs: number;
+  blockerSpawnCooldownMs: number;
 }

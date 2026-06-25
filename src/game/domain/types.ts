@@ -19,7 +19,6 @@ export enum PlayerAction {
   None = 'none',
   MoveLeft = 'move-left',
   MoveRight = 'move-right',
-  Jump = 'jump',
 }
 
 export enum ObstacleType {
