@@ -44,14 +44,19 @@ export class SoundEngine {
   async preloadBackgroundMusic(): Promise<void> {
     await Promise.all(
       BACKGROUND_MUSIC_FILES.map((f) =>
-        this.preloadEncodedAudio(`/game/sound/background/${f}`, `bg:${f}`),
+        this.preloadEncodedAudio(
+          `${import.meta.env.BASE_URL}/game/sound/background/${f}`,
+          `bg:${f}`,
+        ),
       ),
     );
   }
 
   async preloadSfx(): Promise<void> {
     await Promise.all(
-      SFX_FILES.map((f) => this.preloadEncodedAudio(`/game/sound/sfx/${f}`, `sfx:${f}`)),
+      SFX_FILES.map((f) =>
+        this.preloadEncodedAudio(`${import.meta.env.BASE_URL}/game/sound/sfx/${f}`, `sfx:${f}`),
+      ),
     );
   }
 

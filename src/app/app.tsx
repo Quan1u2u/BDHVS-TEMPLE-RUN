@@ -17,7 +17,14 @@ export function App() {
         <Grid boxSize="full" templateRows="auto auto 1fr" alignItems="center">
           <HStack h="fit" alignItems="center" gap={2}>
             {/* Kinda hacky way to align the image, but it's because the original logo not being centered */}
-            <Image fit="cover" w={96} h={20} mt={4} aspectRatio="auto" src="/logo.png" />
+            <Image
+              fit="cover"
+              w={96}
+              h={20}
+              mt={4}
+              aspectRatio="auto"
+              src={`${import.meta.env.BASE_URL}logo.png`}
+            />
             <Heading color="colorPalette.fg" fontFamily="bangers" fontSize="4xl">
               Temple Run Lite, điều khiển bằng cơ thể
             </Heading>

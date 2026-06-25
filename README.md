@@ -96,6 +96,8 @@ pnpm check
 pnpm build
 ```
 
+URL is prefixed with `/BDHVS-TEMPLE-RUN/`
+
 ## Current gameplay scope
 
 This game intentionally keeps the loop narrow:
