@@ -21,6 +21,7 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
   private animationFrame = 0;
 
   public async start(listeners: PoseProviderListeners): Promise<void> {
+    await this.stop();
     this.listeners = listeners;
     this.pushStatus({
       command: PoseCommand.Idle,
@@ -75,17 +76,33 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
     this.video.playsInline = true;
     await this.video.play();
 
-    const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm',
-    );
-    this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
-      },
-      numPoses: 1,
-      runningMode: 'VIDEO',
-    });
+    try {
+      const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm',
+      );
+      this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
+        },
+        numPoses: 1,
+        runningMode: 'VIDEO',
+      });
+    } catch {
+      this.pushStatus({
+        command: PoseCommand.Idle,
+        trackingStatus: 'error',
+        calibrationProgress: 0,
+        cameraEnabled: false,
+        debugMessage: 'MediaPipe failed to initialize',
+        stream: null,
+        landmarks: [],
+        videoWidth: 0,
+        videoHeight: 0,
+      });
+      await this.stop();
+      throw new Error('MediaPipe failed to initialize');
+    }
 
     this.pushStatus({
       command: PoseCommand.Idle,
@@ -118,17 +135,19 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
     this.stream = null;
     this.video.srcObject = null;
     this.classifierState = createInitialPoseClassifierState();
-    this.pushStatus({
-      command: PoseCommand.Idle,
-      trackingStatus: 'idle',
-      calibrationProgress: 0,
-      cameraEnabled: false,
-      debugMessage: 'Pose tracking stopped',
-      stream: null,
-      landmarks: [],
-      videoWidth: 0,
-      videoHeight: 0,
-    });
+    if (this.listeners) {
+      this.pushStatus({
+        command: PoseCommand.Idle,
+        trackingStatus: 'idle',
+        calibrationProgress: 0,
+        cameraEnabled: false,
+        debugMessage: 'Pose tracking stopped',
+        stream: null,
+        landmarks: [],
+        videoWidth: 0,
+        videoHeight: 0,
+      });
+    }
   }
 
   private detectFrame(): void {

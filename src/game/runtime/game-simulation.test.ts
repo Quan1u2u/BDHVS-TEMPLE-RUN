@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { defaultGameSettings } from '../config';
-import { Lane, ObstacleType, PlayerAction } from '../domain/types';
+import { CollectibleType, Lane, ObstacleType, PlayerAction } from '../domain/types';
 import { createInitialWorld } from './world-factory';
 import { stepWorld } from './world-simulation';
 
@@ -44,18 +44,62 @@ describe('stepWorld', () => {
     world.player.targetLane = Lane.Center;
     world.obstacles.push({
       id: 'obstacle-1',
-      type: ObstacleType.FireTrap,
+      type: ObstacleType.Hacker,
       lane: Lane.Center,
       x: world.player.trackPosition,
       width: 70,
       height: 40,
-      scoreDelta: -180,
+      scoreDelta: -20,
+      progress: 1,
     });
 
     stepWorld(world, { deltaMs: 16, action: PlayerAction.None });
 
     expect(world.lives).toBe(2);
-    expect(world.score).toBe(220);
+    expect(world.score).toBe(380);
     expect(world.obstacles).toHaveLength(0);
+  });
+
+  it('applies award-list rewards on collectible collisions', () => {
+    const world = createInitialWorld(defaultGameSettings);
+
+    world.player.currentLane = Lane.Right;
+    world.player.targetLane = Lane.Right;
+    world.collectibles.push({
+      id: 'collectible-1',
+      type: CollectibleType.Cloud,
+      lane: Lane.Right,
+      x: world.player.trackPosition,
+      y: 200,
+      value: 20,
+      progress: 1,
+    });
+
+    stepWorld(world, { deltaMs: 16, action: PlayerAction.None });
+
+    expect(world.score).toBe(20);
+    expect(world.collectibles).toHaveLength(0);
+  });
+
+  it('exposes normalized vertical progress for spawned obstacles and collectibles', () => {
+    const world = createInitialWorld(defaultGameSettings);
+
+    world.obstacleSpawnCooldownMs = 0;
+    world.collectibleSpawnCooldownMs = 0;
+
+    stepWorld(world, { deltaMs: 16, action: PlayerAction.None });
+
+    const spawnedObstacle = world.obstacles[0];
+    const spawnedCollectible = world.collectibles[0];
+
+    expect(spawnedObstacle?.progress).toBe(0);
+    expect(spawnedCollectible?.progress).toBe(0);
+
+    stepWorld(world, { deltaMs: 400, action: PlayerAction.None });
+
+    expect(world.obstacles[0]?.progress).toBeGreaterThan(0);
+    expect(world.obstacles[0]?.progress).toBeLessThanOrEqual(1);
+    expect(world.collectibles[0]?.progress).toBeGreaterThan(0);
+    expect(world.collectibles[0]?.progress).toBeLessThanOrEqual(1);
   });
 });

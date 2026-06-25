@@ -8,6 +8,7 @@ import {
   PoseCommand,
 } from '../domain/types';
 import type { CollectibleState, ObstacleState, WorldRuntimeState } from '../domain/world';
+import { collectibleValue } from '../rules/collectible-value';
 import { obstacleScoreDelta } from '../rules/obstacle-score-delta';
 
 interface StepWorldArgs {
@@ -16,6 +17,8 @@ interface StepWorldArgs {
 }
 
 const laneOrder = [Lane.Left, Lane.Center, Lane.Right] as const;
+const OBSTACLE_SPAWN_X = WORLD_WIDTH + 120;
+const COLLECTIBLE_SPAWN_X = WORLD_WIDTH + 80;
 
 export function stepWorld(world: WorldRuntimeState, { deltaMs, action }: StepWorldArgs): void {
   const deltaSeconds = deltaMs / 1000;
@@ -109,6 +112,8 @@ function updateEntities(world: WorldRuntimeState, deltaSeconds: number): void {
     collectible.x -= travelDistance;
   }
 
+  updateEntityProgress(world);
+
   world.obstacles = world.obstacles.filter((obstacle) => obstacle.x + obstacle.width > -40);
   world.collectibles = world.collectibles.filter((collectible) => collectible.x > -40);
 }
@@ -138,9 +143,11 @@ function spawnEntities(world: WorldRuntimeState, deltaMs: number): void {
 
 function createObstacle(seed: number, settings: WorldRuntimeState['settings']): ObstacleState {
   const obstacleVariants = [
-    { type: ObstacleType.Rock, lane: Lane.Left },
-    { type: ObstacleType.FireTrap, lane: Lane.Center },
-    { type: ObstacleType.Totem, lane: Lane.Right },
+    { type: ObstacleType.Virus, lane: Lane.Left },
+    { type: ObstacleType.Hacker, lane: Lane.Center },
+    { type: ObstacleType.Scam, lane: Lane.Right },
+    { type: ObstacleType.FakeNews, lane: Lane.Left },
+    { type: ObstacleType.Cyberbullying, lane: Lane.Right },
   ] as const;
   const variant =
     obstacleVariants[Math.floor(seed / 1000) % obstacleVariants.length] ?? obstacleVariants[0];
@@ -149,10 +156,11 @@ function createObstacle(seed: number, settings: WorldRuntimeState['settings']): 
     id: `obstacle-${seed}`,
     type: variant.type,
     lane: variant.lane,
-    x: WORLD_WIDTH + 120,
+    x: OBSTACLE_SPAWN_X,
     width: settings.obstacleWidth,
     height: settings.obstacleHeight,
     scoreDelta: obstacleScoreDelta[variant.type],
+    progress: 0,
   };
 }
 
@@ -160,13 +168,25 @@ function createCollectible(
   seed: number,
   settings: WorldRuntimeState['settings'],
 ): CollectibleState {
+  const collectibleVariants = [
+    CollectibleType.AI,
+    CollectibleType.Cloud,
+    CollectibleType.STEM,
+    CollectibleType.DigitalCitizen,
+    CollectibleType.ELearning,
+  ] as const;
+  const type =
+    collectibleVariants[Math.floor(seed / 700) % collectibleVariants.length] ??
+    CollectibleType.STEM;
+
   return {
     id: `collectible-${seed}`,
-    type: CollectibleType.Coin,
+    type,
     lane: laneOrder[Math.floor(seed / 700) % laneOrder.length] ?? Lane.Center,
-    x: WORLD_WIDTH + 80,
+    x: COLLECTIBLE_SPAWN_X,
     y: 200,
-    value: settings.collectibleValue,
+    value: collectibleValue[type] ?? settings.collectibleValue,
+    progress: 0,
   };
 }
 
@@ -217,4 +237,26 @@ function clampLane(lane: Lane): Lane {
   }
 
   return lane;
+}
+
+function updateEntityProgress(world: WorldRuntimeState): void {
+  const obstacleTravelSpan = Math.max(1, OBSTACLE_SPAWN_X - world.player.trackPosition);
+  const collectibleTravelSpan = Math.max(1, COLLECTIBLE_SPAWN_X - world.player.trackPosition);
+
+  for (const obstacle of world.obstacles) {
+    obstacle.progress = clampProgress(
+      (OBSTACLE_SPAWN_X - Math.max(obstacle.x, world.player.trackPosition)) / obstacleTravelSpan,
+    );
+  }
+
+  for (const collectible of world.collectibles) {
+    collectible.progress = clampProgress(
+      (COLLECTIBLE_SPAWN_X - Math.max(collectible.x, world.player.trackPosition)) /
+        collectibleTravelSpan,
+    );
+  }
+}
+
+function clampProgress(progress: number): number {
+  return Math.max(0, Math.min(1, progress));
 }

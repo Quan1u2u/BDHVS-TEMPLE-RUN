@@ -19,4 +19,14 @@ describe('obstacleScoreDelta', () => {
       expect(delta).toBeLessThan(0);
     }
   });
+
+  it('matches the harmful award table', () => {
+    expect(obstacleScoreDelta).toEqual({
+      [ObstacleType.Virus]: -20,
+      [ObstacleType.Hacker]: -20,
+      [ObstacleType.Scam]: -10,
+      [ObstacleType.FakeNews]: -5,
+      [ObstacleType.Cyberbullying]: -5,
+    });
+  });
 });

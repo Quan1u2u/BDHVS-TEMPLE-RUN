@@ -1,10 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { GamePhase, Lane, PoseCommand } from '../game/domain/types';
-import { type GameMetricsSnapshot, gameStore } from './game-store';
+import { CollectibleType, GamePhase, Lane, ObstacleType, PoseCommand } from '../game/domain/types';
+import {
+  defaultMetrics,
+  defaultRenderSnapshot,
+  type GameMetricsSnapshot,
+  type GameRenderSnapshot,
+  gameStore,
+} from './game-store';
 import { createMetricsSink } from './game-store-bridge';
 
 describe('createMetricsSink', () => {
+  beforeEach(() => {
+    gameStore.getState().setMetrics(defaultMetrics);
+    gameStore.getState().setRender(defaultRenderSnapshot);
+  });
+
   it('publishes runtime snapshots into Zustand state', () => {
     const sink = createMetricsSink();
 
@@ -57,5 +68,74 @@ describe('createMetricsSink', () => {
     const secondMetricsRef = gameStore.getState().metrics;
 
     expect(secondMetricsRef).toBe(firstMetricsRef);
+  });
+
+  it('publishes render snapshot data into Zustand state', () => {
+    const sink = createMetricsSink();
+
+    sink.publishRenderState({
+      playerLane: Lane.Center,
+      playerProgress: 1,
+      obstacles: [
+        {
+          id: 'obstacle-1',
+          lane: Lane.Left,
+          progress: 0.25,
+          type: ObstacleType.Virus,
+        },
+      ],
+      collectibles: [
+        {
+          id: 'collectible-1',
+          lane: Lane.Right,
+          progress: 0.5,
+          type: CollectibleType.Cloud,
+        },
+      ],
+      renderError: 'Tilesheet unavailable',
+    });
+
+    const state = gameStore.getState();
+    expect(state.render.playerLane).toBe(Lane.Center);
+    expect(state.render.playerProgress).toBe(1);
+    expect(state.render.obstacles).toHaveLength(1);
+    expect(state.render.collectibles[0]?.type).toBe(CollectibleType.Cloud);
+    expect(state.render.renderError).toBe('Tilesheet unavailable');
+  });
+
+  it('does not replace the render object when the snapshot is unchanged', () => {
+    const sink = createMetricsSink();
+    const snapshot: GameRenderSnapshot = {
+      playerLane: Lane.Right,
+      playerProgress: 1,
+      obstacles: [
+        {
+          id: 'obstacle-1',
+          lane: Lane.Center,
+          progress: 0.75,
+          type: ObstacleType.Hacker,
+        },
+      ],
+      collectibles: [
+        {
+          id: 'collectible-1',
+          lane: Lane.Left,
+          progress: 0.5,
+          type: CollectibleType.AI,
+        },
+      ],
+      renderError: null,
+    };
+
+    sink.publishRenderState(snapshot);
+    const firstRenderRef = gameStore.getState().render;
+    sink.publishRenderState({
+      ...snapshot,
+      obstacles: [...snapshot.obstacles],
+      collectibles: [...snapshot.collectibles],
+    });
+    const secondRenderRef = gameStore.getState().render;
+
+    expect(secondRenderRef).toBe(firstRenderRef);
   });
 });

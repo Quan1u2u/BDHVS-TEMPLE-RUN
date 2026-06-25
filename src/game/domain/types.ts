@@ -23,13 +23,19 @@ export enum PlayerAction {
 }
 
 export enum ObstacleType {
-  Rock = 'rock',
-  FireTrap = 'fire-trap',
-  Totem = 'totem',
+  Virus = 'virus',
+  Hacker = 'hacker',
+  Scam = 'scam',
+  FakeNews = 'fake-news',
+  Cyberbullying = 'cyberbullying',
 }
 
 export enum CollectibleType {
-  Coin = 'coin',
+  AI = 'ai',
+  Cloud = 'cloud',
+  STEM = 'stem',
+  DigitalCitizen = 'digital-citizen',
+  ELearning = 'e-learning',
 }
 
 export enum PoseCommand {

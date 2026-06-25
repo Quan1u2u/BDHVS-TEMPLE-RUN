@@ -26,6 +26,7 @@ export interface ObstacleState {
   width: number;
   height: number;
   scoreDelta: number;
+  progress: number;
 }
 
 export interface CollectibleState {
@@ -35,6 +36,7 @@ export interface CollectibleState {
   x: number;
   y: number;
   value: number;
+  progress: number;
 }
 
 export interface WorldRuntimeState {

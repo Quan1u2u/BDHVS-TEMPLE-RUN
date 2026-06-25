@@ -2,8 +2,10 @@ import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import {
+  type CollectibleType,
   GamePhase,
   Lane,
+  type ObstacleType,
   PoseCommand,
   type PoseLandmark,
   type TrackingStatus,
@@ -28,6 +30,7 @@ export interface GameMetricsSnapshot {
 
 export interface GameStoreState {
   metrics: GameMetricsSnapshot;
+  render: GameRenderSnapshot;
   preview: {
     stream: MediaStream | null;
     landmarks: PoseLandmark[];
@@ -35,7 +38,16 @@ export interface GameStoreState {
     videoHeight: number;
   };
   setMetrics: (metrics: GameMetricsSnapshot) => void;
+  setRender: (render: GameRenderSnapshot) => void;
   setPreview: (preview: GameStoreState['preview']) => void;
+}
+
+export interface GameRenderSnapshot {
+  playerLane: Lane;
+  playerProgress: number;
+  obstacles: Array<{ id: string; lane: Lane; progress: number; type: ObstacleType }>;
+  collectibles: Array<{ id: string; lane: Lane; progress: number; type: CollectibleType }>;
+  renderError: string | null;
 }
 
 export const defaultMetrics: GameMetricsSnapshot = {
@@ -55,8 +67,17 @@ export const defaultMetrics: GameMetricsSnapshot = {
   bootProgress: 0,
 };
 
+export const defaultRenderSnapshot: GameRenderSnapshot = {
+  playerLane: Lane.Center,
+  playerProgress: 1,
+  obstacles: [],
+  collectibles: [],
+  renderError: null,
+};
+
 export const gameStore = createStore<GameStoreState>()((set) => ({
   metrics: defaultMetrics,
+  render: defaultRenderSnapshot,
   preview: {
     stream: null,
     landmarks: [],
@@ -65,6 +86,9 @@ export const gameStore = createStore<GameStoreState>()((set) => ({
   },
   setMetrics: (metrics) => {
     set({ metrics });
+  },
+  setRender: (render) => {
+    set({ render });
   },
   setPreview: (preview) => {
     set({ preview });

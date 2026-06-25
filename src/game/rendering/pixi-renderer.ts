@@ -4,15 +4,17 @@ import {
   Color,
   Container,
   Graphics,
+  Point,
   Rectangle,
   Sprite,
   Texture,
 } from 'pixi.js';
 
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../config';
-import { type Lane, ObstacleType } from '../domain/types';
+import { CollectibleType, type Lane, ObstacleType } from '../domain/types';
 import type { WorldRuntimeState } from '../domain/world';
-import { getTileFrame, TILE_SIZE_PX, TileId } from '../tiles/tile-atlas';
+import { getTileFrame, TileId } from '../tiles/tile-atlas';
+import { computeTileSize } from './render-scale';
 
 export interface RendererPort {
   mount: (host: HTMLElement) => Promise<void>;
@@ -78,78 +80,97 @@ export class PixiRenderer implements RendererPort {
     const width = PixiRenderer.app.renderer.width || WORLD_WIDTH;
     const height = PixiRenderer.app.renderer.height || WORLD_HEIGHT;
     const laneWidth = width / 3;
-    const horizonY = height * 0.35;
-    const groundY = height * 0.8;
+    const tileSize = computeTileSize(width, world.settings.tileScale);
+    const rows = Math.max(6, Math.ceil(height / tileSize) + 1);
+    const horizonY = tileSize;
+    const groundY = height - tileSize * 1.5;
 
     PixiRenderer.background
       .clear()
       .rect(0, 0, width, height)
-      .fill({ color: '#08111a' })
-      .rect(0, 0, width, horizonY)
-      .fill({ color: '#10253b' })
-      .rect(0, horizonY, width, groundY - horizonY)
-      .fill({ color: '#17304d' })
-      .rect(0, groundY, width, height - groundY)
-      .fill({ color: '#070d14' });
+      .fill({ color: '#10161f' })
+      .rect(0, 0, width, horizonY * 2)
+      .fill({ color: '#182433' })
+      .rect(0, horizonY * 2, width, height - horizonY * 2)
+      .fill({ color: '#0a0f17' });
 
     PixiRenderer.lanes.clear();
     for (let lane = 0; lane < 4; lane += 1) {
       const x = laneWidth * lane;
       PixiRenderer.lanes
-        .moveTo(x, groundY)
-        .lineTo(width / 2 + (x - width / 2) * 0.25, horizonY)
-        .stroke({ color: '#2f5d88', width: 2 });
+        .moveTo(x, horizonY)
+        .lineTo(x, height)
+        .stroke({ color: '#29405c', width: 2 });
     }
 
     PixiRenderer.entities.removeChildren();
-    const laneTileIds = [TileId.RED_SAND_3, TileId.RED_SAND_WALL_BL, TileId.RED_SAND_WALL_B];
-    const tileSize = world.settings.tileScale * TILE_SIZE_PX;
+    const laneTileIds = [TileId.FLOOR_2, TileId.FLOOR_4, TileId.FLOOR_6];
 
-    for (let row = 0; row < 6; row += 1) {
+    for (let row = 0; row < rows; row += 1) {
       for (let lane = 0; lane < 3; lane += 1) {
         const tileId = laneTileIds[lane] ?? TileId.RED_SAND_3;
         const tileSprite = createTileSprite(PixiRenderer.tileTexture, tileId, tileSize);
         tileSprite.x = laneWidth * lane + laneWidth * 0.5 - tileSize * 0.5;
-        tileSprite.y = groundY - tileSize * (row + 1);
+        tileSprite.y = height - tileSize * (row + 1);
         PixiRenderer.entities.addChild(tileSprite);
       }
+    }
+
+    const borderTiles = [TileId.BORDER_L, TileId.BORDER_C, TileId.BORDER_R];
+    for (let lane = 0; lane < 3; lane += 1) {
+      const borderSprite = createTileSprite(
+        PixiRenderer.tileTexture,
+        borderTiles[lane] ?? TileId.BORDER_C,
+        tileSize,
+      );
+      borderSprite.x = laneWidth * lane + laneWidth * 0.5 - tileSize * 0.5;
+      borderSprite.y = groundY;
+      PixiRenderer.entities.addChild(borderSprite);
     }
 
     for (const obstacle of world.obstacles) {
       const x = laneToX(obstacle.lane, laneWidth) + obstacle.x - world.player.trackPosition;
       const obstacleTile = createTileSprite(
         PixiRenderer.tileTexture,
-        obstacle.type === ObstacleType.FireTrap ? TileId.OBSTACLE_5 : TileId.TILE_78,
-        tileSize * 1.4,
+        obstacleTileId(obstacle.type),
+        tileSize,
       );
       obstacleTile.x = x - obstacleTile.width * 0.5;
-      obstacleTile.y = groundY - obstacle.height;
+      obstacleTile.y = groundY - tileSize;
       PixiRenderer.entities.addChild(obstacleTile);
     }
 
     for (const collectible of world.collectibles) {
       const x = laneToX(collectible.lane, laneWidth) + collectible.x - world.player.trackPosition;
-      const collectibleTile = createTileSprite(PixiRenderer.tileTexture, TileId.BORDER_C, tileSize);
+      const collectibleTile = createTileSprite(
+        PixiRenderer.tileTexture,
+        collectibleTileId(collectible.type),
+        tileSize,
+      );
       collectibleTile.x = x - collectibleTile.width * 0.5;
-      collectibleTile.y = groundY - 110;
+      collectibleTile.y = groundY - tileSize * 2.1;
       PixiRenderer.entities.addChild(collectibleTile);
     }
 
     const playerX = laneToX(Math.round(world.player.currentLane) as Lane, laneWidth);
-    const playerY = groundY - 60 - world.player.jumpHeight;
+    const playerBaseHeight = tileSize * 1.6;
+    const playerY = groundY - playerBaseHeight - world.player.jumpHeight;
+    const playerWidth = Math.max(world.settings.playerBodyWidth, tileSize * 0.9);
+    const playerHeight = Math.max(world.settings.playerBodyHeight, tileSize * 1.2);
+    const headRadius = Math.max(world.settings.playerHeadRadius, tileSize * 0.32);
     PixiRenderer.runner
       .clear()
-      .circle(playerX, groundY - 12, 28)
+      .circle(playerX, groundY + tileSize * 0.2, tileSize * 0.45)
       .fill({ color: '#0b1118', alpha: 0.3 })
       .roundRect(
-        playerX - world.settings.playerBodyWidth * 0.5,
-        playerY - world.settings.playerBodyHeight,
-        world.settings.playerBodyWidth,
-        world.settings.playerBodyHeight,
-        12,
+        playerX - playerWidth * 0.5,
+        playerY - playerHeight,
+        playerWidth,
+        playerHeight,
+        tileSize * 0.2,
       )
       .fill({ color: '#59d0ff' })
-      .circle(playerX, playerY - 76, world.settings.playerHeadRadius)
+      .circle(playerX, playerY - playerHeight - headRadius * 0.65, headRadius)
       .fill({ color: '#f7fbff' });
   }
 
@@ -187,5 +208,36 @@ function createTileSprite(tileTexture: Texture | null, tileId: TileId, size: num
   const sprite = new Sprite(texture);
   sprite.width = size;
   sprite.height = size;
+  sprite.anchor = new Point(0, 0);
   return sprite;
+}
+
+function obstacleTileId(obstacleType: ObstacleType): TileId {
+  switch (obstacleType) {
+    case ObstacleType.Virus:
+      return TileId.OBSTACLE_1;
+    case ObstacleType.Hacker:
+      return TileId.OBSTACLE_2;
+    case ObstacleType.Scam:
+      return TileId.OBSTACLE_3;
+    case ObstacleType.FakeNews:
+      return TileId.OBSTACLE_4;
+    case ObstacleType.Cyberbullying:
+      return TileId.OBSTACLE_5;
+  }
+}
+
+function collectibleTileId(collectibleType: CollectibleType): TileId {
+  switch (collectibleType) {
+    case CollectibleType.AI:
+      return TileId.AWARD_1;
+    case CollectibleType.Cloud:
+      return TileId.AWARD_2;
+    case CollectibleType.STEM:
+      return TileId.AWARD_3;
+    case CollectibleType.DigitalCitizen:
+      return TileId.AWARD_4;
+    case CollectibleType.ELearning:
+      return TileId.AWARD_5;
+  }
 }

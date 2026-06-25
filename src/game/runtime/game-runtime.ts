@@ -13,15 +13,14 @@ import {
 import type { WorldRuntimeState } from '../domain/world';
 import { MediaPipePoseProvider } from '../input/mediapipe-pose-provider';
 import type { PoseCommandProvider, PoseProviderStatus } from '../input/pose-provider';
-import { PixiRenderer, type RendererPort } from '../rendering/pixi-renderer';
 import { createInitialWorld } from './world-factory';
 import { stepWorld } from './world-simulation';
 
 interface RuntimeContext {
+  sessionId: number;
   host: HTMLElement;
-  renderer: RendererPort;
   metricsSink: MetricsSink;
-  poseProvider: PoseCommandProvider;
+  poseProvider: PoseCommandProvider | null;
   world: WorldRuntimeState;
   lastFrameAt: number;
   frameHandle: number;
@@ -34,15 +33,16 @@ interface RuntimeContext {
 export class GameRuntime {
   private static context: RuntimeContext | null = null;
   private static boundKeyHandler: ((event: KeyboardEvent) => void) | null = null;
+  private static sessionCounter = 0;
 
   public static async bootstrap(host: HTMLElement, metricsSink: MetricsSink): Promise<void> {
+    const sessionId = ++GameRuntime.sessionCounter;
     const bootstrapStart = performance.now();
-    const renderer = new PixiRenderer();
     const context: RuntimeContext = {
+      sessionId,
       host,
-      renderer,
       metricsSink,
-      poseProvider: new MediaPipePoseProvider(),
+      poseProvider: null,
       world: createInitialWorld(getAppliedGameSettings()),
       lastFrameAt: performance.now(),
       frameHandle: 0,
@@ -56,35 +56,64 @@ export class GameRuntime {
     context.world.debugMessage = 'Preparing DOM shell';
     GameRuntime.publishMetrics();
     await nextFrame();
+    if (!GameRuntime.isSessionActive(sessionId)) {
+      return;
+    }
 
-    await GameRuntime.runBootStage('boot-assets', 0.16, 'Loading boot assets', async () => {
-      await AssetPipeline.loadBundle('boot');
+    await GameRuntime.runBootStage(
+      sessionId,
+      'boot-assets',
+      0.16,
+      'Loading boot assets',
+      async () => {
+        await AssetPipeline.loadBundle('boot');
+      },
+    );
+    await nextFrame();
+    if (!GameRuntime.isSessionActive(sessionId)) {
+      return;
+    }
+
+    await GameRuntime.runBootStage(sessionId, 'pixi', 0.34, 'Preparing render state', async () => {
+      host.setAttribute('data-runtime-ready', 'true');
     });
     await nextFrame();
+    if (!GameRuntime.isSessionActive(sessionId)) {
+      return;
+    }
 
-    await GameRuntime.runBootStage('pixi', 0.34, 'Mounting Pixi renderer', async () => {
-      await renderer.mount(host);
-    });
+    await GameRuntime.runBootStage(
+      sessionId,
+      'gameplay-assets',
+      0.58,
+      'Loading gameplay assets',
+      async () => {
+        await AssetPipeline.loadBundle('gameplay');
+      },
+    );
     await nextFrame();
+    if (!GameRuntime.isSessionActive(sessionId)) {
+      return;
+    }
 
-    await GameRuntime.runBootStage('gameplay-assets', 0.58, 'Loading gameplay assets', async () => {
-      await AssetPipeline.loadBundle('gameplay');
-    });
-    await nextFrame();
-
-    await GameRuntime.runBootStage('audio', 0.82, 'Decoding audio buffers', async () => {
+    await GameRuntime.runBootStage(sessionId, 'audio', 0.82, 'Decoding audio buffers', async () => {
       await Promise.all([soundEngine.preloadBackgroundMusic(), soundEngine.preloadSfx()]);
     });
+    if (!GameRuntime.isSessionActive(sessionId)) {
+      return;
+    }
 
-    await GameRuntime.runBootStage('ready', 1, 'Runtime ready', async () => {
+    await GameRuntime.runBootStage(sessionId, 'ready', 1, 'Runtime ready', async () => {
       soundEngine.applyMix(getAppliedGameSettings());
       GameRuntime.bindKeyboard();
       context.world.phase = GamePhase.CameraPermission;
       context.world.debugMessage = `Runtime ready in ${Math.round(performance.now() - bootstrapStart)}ms`;
     });
+    if (!GameRuntime.isSessionActive(sessionId)) {
+      return;
+    }
 
     GameRuntime.publishMetrics();
-    GameRuntime.render();
     GameRuntime.tick();
   }
 
@@ -93,11 +122,11 @@ export class GameRuntime {
       return;
     }
 
+    GameRuntime.sessionCounter += 1;
     cancelAnimationFrame(GameRuntime.context.frameHandle);
     GameRuntime.unbindKeyboard();
-    await GameRuntime.context.poseProvider.stop();
+    await GameRuntime.context.poseProvider?.stop();
     soundEngine.stopBackgroundMusic();
-    await GameRuntime.context.renderer.destroy();
     GameRuntime.context = null;
   }
 
@@ -106,20 +135,40 @@ export class GameRuntime {
       return;
     }
 
+    if (!GameRuntime.context.poseProvider) {
+      GameRuntime.context.poseProvider = new MediaPipePoseProvider();
+    }
+
     GameRuntime.context.world.phase = GamePhase.CameraPermission;
     GameRuntime.context.world.debugMessage = 'Starting camera tracking';
     GameRuntime.publishMetrics();
-    await GameRuntime.context.poseProvider.start({
-      onCommand(command) {
-        const action = mapPoseCommandToAction(command);
-        if (action !== PlayerAction.None && GameRuntime.context) {
-          GameRuntime.context.pendingAction = action;
-        }
-      },
-      onStatus(status) {
-        GameRuntime.applyPoseStatus(status);
-      },
-    });
+
+    try {
+      await GameRuntime.context.poseProvider.start({
+        onCommand(command) {
+          const action = mapPoseCommandToAction(command);
+          if (action !== PlayerAction.None && GameRuntime.context) {
+            GameRuntime.context.pendingAction = action;
+          }
+        },
+        onStatus(status) {
+          GameRuntime.applyPoseStatus(status);
+        },
+      });
+    } catch {
+      GameRuntime.context.world.cameraEnabled = false;
+      GameRuntime.context.world.trackingStatus = 'error';
+      GameRuntime.context.world.debugMessage = 'Camera startup failed; keyboard fallback active';
+      GameRuntime.context.world.phase = GamePhase.Running;
+      GameRuntime.publishMetrics();
+      GameRuntime.startKeyboardRun();
+      return;
+    }
+
+    if (!GameRuntime.context.world.cameraEnabled) {
+      GameRuntime.context.world.debugMessage = 'Camera unavailable; keyboard fallback active';
+      GameRuntime.startKeyboardRun();
+    }
   }
 
   public static startKeyboardRun(): void {
@@ -169,7 +218,6 @@ export class GameRuntime {
     soundEngine.applyMix(replacement.settings);
     GameRuntime.ensureBackgroundMusic(true);
     GameRuntime.publishMetrics();
-    GameRuntime.render();
   }
 
   public static applySettingsAndRestart(): void {
@@ -214,14 +262,9 @@ export class GameRuntime {
     }
 
     GameRuntime.publishMetrics();
-    GameRuntime.render();
     GameRuntime.context.frameHandle = requestAnimationFrame(() => {
       GameRuntime.tick();
     });
-  }
-
-  private static render(): void {
-    GameRuntime.context?.renderer.render(GameRuntime.context.world);
   }
 
   private static publishMetrics(): void {
@@ -230,6 +273,7 @@ export class GameRuntime {
     }
 
     const { world } = GameRuntime.context;
+    const renderError = gameStore.getState().render.renderError;
     GameRuntime.context.metricsSink.publish({
       score: world.score,
       distance: world.distance,
@@ -245,6 +289,23 @@ export class GameRuntime {
       debugMessage: world.debugMessage,
       bootStage: GameRuntime.context.bootStage,
       bootProgress: GameRuntime.context.bootProgress,
+    });
+    GameRuntime.context.metricsSink.publishRenderState({
+      playerLane: Math.round(world.player.currentLane) as Lane,
+      playerProgress: 1,
+      obstacles: world.obstacles.map((obstacle) => ({
+        id: obstacle.id,
+        lane: obstacle.lane,
+        progress: obstacle.progress,
+        type: obstacle.type,
+      })),
+      collectibles: world.collectibles.map((collectible) => ({
+        id: collectible.id,
+        lane: collectible.lane,
+        progress: collectible.progress,
+        type: collectible.type,
+      })),
+      renderError,
     });
   }
 
@@ -283,20 +344,30 @@ export class GameRuntime {
   }
 
   private static async runBootStage(
+    sessionId: number,
     stage: string,
     progress: number,
     message: string,
     task: () => Promise<void>,
   ): Promise<void> {
-    if (!GameRuntime.context) {
+    if (!GameRuntime.isSessionActive(sessionId)) {
       return;
     }
 
-    GameRuntime.context.bootStage = stage;
-    GameRuntime.context.bootProgress = progress;
-    GameRuntime.context.world.debugMessage = message;
+    const context = GameRuntime.context;
+    if (!context) {
+      return;
+    }
+
+    context.bootStage = stage;
+    context.bootProgress = progress;
+    context.world.debugMessage = message;
     GameRuntime.publishMetrics();
     await task();
+  }
+
+  private static isSessionActive(sessionId: number): boolean {
+    return GameRuntime.context?.sessionId === sessionId && GameRuntime.sessionCounter === sessionId;
   }
 
   private static bindKeyboard(): void {
@@ -372,9 +443,9 @@ function mapTrackingStatusToPhase(status: TrackingStatus, previousPhase: GamePha
     case 'lost':
       return GamePhase.Paused;
     case 'denied':
-      return GamePhase.CameraPermission;
+      return previousPhase === GamePhase.Running ? GamePhase.Running : GamePhase.CameraPermission;
     case 'error':
-      return GamePhase.Recovery;
+      return previousPhase === GamePhase.Running ? GamePhase.Running : GamePhase.Recovery;
     case 'idle':
       return previousPhase;
   }
