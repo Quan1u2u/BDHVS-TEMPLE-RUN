@@ -1,19 +1,13 @@
-# Temple Run Lite
+# BDHVS-TEMPLE-RUN
 
-Temple Run Lite is a deliberate reinitialization of a previously tangled prototype into a game-first TypeScript codebase with explicit boundaries between UI, simulation, rendering, and pose input.
+A simple Temple Run-like game.
 
-## Why this repo was reinitialized
+## What you need?
 
-The old project was effectively a single HTML file with inline state, rendering, controls, and diagnostics all intertwined. That was useful for proving the idea, but it made the next steps expensive:
+- Node.js latest LTS (v24+)
+- PNPM
 
-- changing one subsystem risked breaking several others
-- runtime logic lived too close to the UI surface
-- there was no strict TypeScript safety net
-- tooling, formatting, hooks, and tests were missing
-
-This rebuild treats the prototype as reference material, not as a foundation.
-
-## Design decisions
+## Design decisions (must read before continuing)
 
 ### React/DOM and Pixi are intentionally split
 
@@ -88,7 +82,9 @@ The current build leans on programmatic Pixi rendering and lightweight placehold
 
 ```bash
 pnpm install
-pnpm dev
+# should note that this only works for the React-side of things.
+# to test the game logic, it's required to use the production build.
+pnpm dev 
 ```
 
 Common commands:
@@ -102,21 +98,23 @@ pnpm build
 
 ## Current gameplay scope
 
-This v1 rebuild intentionally keeps the loop narrow:
+This game intentionally keeps the loop narrow:
 
-- left, right, jump
+- left, right
 - endless lane runner
-- obstacles, coins, score, lives
+- obstacles, score, lives
 - speed ramp
 - restart loop
 - webcam pose input plus keyboard fallback
 
-## Extension points
+## License
 
-The current structure is designed to grow without collapsing boundaries. Natural next steps include:
+MIT
 
-- adding `SLIDE` as a fourth action
-- replacing placeholder visuals with authored sprites and audio
-- richer obstacle behavior and non-score effect payloads
-- more advanced calibration heuristics
-- persistence, settings, and accessibility tuning
+This project uses: 
+- The [Tiny Dungeon asset pack](https://kenney.nl/assets/tiny-dungeon) - CC0
+- Simple Web Audio API sound engine from Hoàng Minh Thiên, originally crafted for The Gifted Battlefield
+- SFXes chopped from various sources, reduced qualities, ensuring fair use
+- [Andrah - pretty afternoon \[NCS Release\]](http://ncs.io/prettyafternoon) - NCS
+
+Special thanks to the creators of these arts/software.
