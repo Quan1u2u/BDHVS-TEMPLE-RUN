@@ -1,0 +1,19 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource/bangers";
+
+*,
+:not(input),
+:not(textarea) {
+  user-select: none;
+}
+
+* {
+  scrollbar-gutter: stable;
+  /* Tailwind "antialiased" */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}

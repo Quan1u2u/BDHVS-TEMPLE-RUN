@@ -1,0 +1,5 @@
+set -e
+pnpm exec biome check --write --staged --no-errors-on-unmatched
+pnpm typecheck
+pnpm test
+git add -u
