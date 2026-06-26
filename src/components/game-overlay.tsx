@@ -50,7 +50,7 @@ export function GameOverlay() {
       <Box
         borderWidth={1}
         borderRadius="md"
-        maxW="sm"
+        w={64}
         p={4}
         position="absolute"
         top={6}
