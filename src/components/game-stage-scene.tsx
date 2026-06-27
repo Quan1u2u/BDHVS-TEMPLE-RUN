@@ -1,4 +1,6 @@
 import { Application, extend } from '@pixi/react';
+import { useAtomValue } from 'jotai';
+import { getDefaultStore } from 'jotai/vanilla';
 import {
   Assets,
   Container,
@@ -9,60 +11,58 @@ import {
   TextureStyle,
 } from 'pixi.js';
 import { useEffect, useState } from 'react';
-import { GamePhase } from '../game/domain/types';
+
 import { TILESHEET_PATH } from '../game/tiles/tile-atlas';
-import type { GameRenderSnapshot } from '../store/game-store';
-import { gameStore } from '../store/game-store';
+import { phaseAtom } from '../store/atoms/metrics-atoms';
+import {
+  blockedRowsAtom,
+  boardScrollOffsetRowsAtom,
+  collectiblesAtom,
+  obstaclesAtom,
+  playerLaneAtom,
+  renderErrorAtom,
+  unitsPerBoardRowAtom,
+} from '../store/atoms/render-atoms';
 import { BoardEntityLayer } from './board-entity-layer';
 import { BoardFloorLayer } from './board-floor-layer';
 import { PlayerLayer } from './player-layer';
 
 TextureStyle.defaultOptions.scaleMode = 'nearest';
 extensions.add(CullerPlugin);
-
-extend({
-  Container,
-  Sprite,
-});
+extend({ Container, Sprite });
 
 interface GameStageSceneProps {
   height: number;
-  phase: GamePhase;
-  render: GameRenderSnapshot;
   tileSize: number;
   visibleRows: number;
   width: number;
 }
 
-export function GameStageScene({
-  height,
-  phase,
-  render,
-  tileSize,
-  visibleRows,
-  width,
-}: GameStageSceneProps) {
+export function GameStageScene({ height, tileSize, visibleRows, width }: GameStageSceneProps) {
   const [tileTexture, setTileTexture] = useState<Texture | null>(null);
+
+  const phase = useAtomValue(phaseAtom);
+  const playerLane = useAtomValue(playerLaneAtom);
+  const boardScrollOffsetRows = useAtomValue(boardScrollOffsetRowsAtom);
+  const unitsPerBoardRow = useAtomValue(unitsPerBoardRowAtom);
+  const blockedRows = useAtomValue(blockedRowsAtom);
+  const obstacles = useAtomValue(obstaclesAtom);
+  const collectibles = useAtomValue(collectiblesAtom);
 
   useEffect(() => {
     let active = true;
-
     async function loadTexture() {
       try {
         const loaded = await Assets.load(TILESHEET_PATH);
         if (active && loaded instanceof Texture) {
           setTileTexture(loaded);
-          const current = gameStore.getState().render;
-          gameStore.getState().setRender({ ...current, renderError: null });
+          getDefaultStore().set(renderErrorAtom, null);
         }
       } catch {
-        const current = gameStore.getState().render;
-        gameStore.getState().setRender({ ...current, renderError: 'Tilesheet unavailable' });
+        getDefaultStore().set(renderErrorAtom, 'Tilesheet unavailable');
       }
     }
-
     void loadTexture();
-
     return () => {
       active = false;
     };
@@ -79,30 +79,34 @@ export function GameStageScene({
       sharedTicker={false}
     >
       <pixiContainer cullableChildren>
-        {tileTexture && phase !== GamePhase.Boot ? (
+        {tileTexture ? (
           <>
             <BoardFloorLayer
-              render={render}
               tileSize={tileSize}
               tileTexture={tileTexture}
               visibleRows={visibleRows}
+              phase={phase}
+              boardScrollOffsetRows={boardScrollOffsetRows}
+              blockedRows={blockedRows}
+              unitsPerBoardRow={unitsPerBoardRow}
             />
-            {phase === GamePhase.Running ? (
-              <BoardEntityLayer
-                render={render}
-                tileSize={tileSize}
-                tileTexture={tileTexture}
-                visibleRows={visibleRows}
-              />
-            ) : null}
+            <BoardEntityLayer
+              tileSize={tileSize}
+              tileTexture={tileTexture}
+              visibleRows={visibleRows}
+              phase={phase}
+              obstacles={obstacles}
+              collectibles={collectibles}
+              unitsPerBoardRow={unitsPerBoardRow}
+            />
           </>
         ) : null}
         <PlayerLayer
-          phase={phase}
-          render={render}
           tileSize={tileSize}
           tileTexture={tileTexture}
           visibleRows={visibleRows}
+          phase={phase}
+          playerLane={playerLane}
         />
       </pixiContainer>
     </Application>

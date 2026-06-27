@@ -1,9 +1,12 @@
 import { Button, Dialog, Portal, Text } from '@chakra-ui/react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { GameRuntime } from '@/game/runtime/game-runtime';
-import { useGameOverStore } from '@/store/game-over-store';
+import { gameOverOpenAtom, gameOverScoreAtom } from '@/store/atoms';
 
 export function GameOverDialog() {
-  const { open, score, close } = useGameOverStore();
+  const open = useAtomValue(gameOverOpenAtom);
+  const score = useAtomValue(gameOverScoreAtom);
+  const closeGameOver = useSetAtom(gameOverOpenAtom);
 
   return (
     <Dialog.Root open={open} size="sm">
@@ -24,7 +27,7 @@ export function GameOverDialog() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    close();
+                    closeGameOver(false);
                     GameRuntime.resetToIdle();
                   }}
                 >
@@ -34,7 +37,7 @@ export function GameOverDialog() {
               <Button
                 colorPalette="blue"
                 onClick={() => {
-                  close();
+                  closeGameOver(false);
                   GameRuntime.restart();
                 }}
               >

@@ -1,30 +1,40 @@
+import { getDefaultStore } from 'jotai/vanilla';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defaultGameSettings } from '@/game/config';
-import { createSettingsStore } from './game-settings-store';
+import {
+  appliedSettingsAtom,
+  discardDraftAtom,
+  draftSettingsAtom,
+  isDirtyAtom,
+  isSettingsPanelOpenAtom,
+  saveDraftAtom,
+  updateDraftSettingAtom,
+} from './atoms/settings-atoms';
 
-describe('game settings store', () => {
+describe('settings atoms', () => {
+  const store = getDefaultStore();
+  const STORAGE_KEY = 'temple-run-lite.settings';
   const localStorageMock = (() => {
-    const store = new Map<string, string>();
-
+    const map = new Map<string, string>();
     return {
       clear() {
-        store.clear();
+        map.clear();
       },
       getItem(key: string) {
-        return store.get(key) ?? null;
+        return map.get(key) ?? null;
       },
       key(index: number) {
-        return Array.from(store.keys())[index] ?? null;
+        return Array.from(map.keys())[index] ?? null;
       },
       removeItem(key: string) {
-        store.delete(key);
+        map.delete(key);
       },
       setItem(key: string, value: string) {
-        store.set(key, value);
+        map.set(key, value);
       },
       get length() {
-        return store.size;
+        return map.size;
       },
     };
   })();
@@ -32,6 +42,9 @@ describe('game settings store', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', localStorageMock);
     localStorageMock.clear();
+    store.set(appliedSettingsAtom, { ...defaultGameSettings });
+    store.set(draftSettingsAtom, { ...defaultGameSettings });
+    store.set(isSettingsPanelOpenAtom, false);
   });
 
   afterEach(() => {
@@ -39,31 +52,22 @@ describe('game settings store', () => {
   });
 
   it('keeps draft changes separate until save', () => {
-    const store = createSettingsStore();
-
-    store.getState().updateDraftSetting('laneSnapSpeed', 12);
-
-    expect(store.getState().draftSettings.laneSnapSpeed).toBe(12);
-    expect(store.getState().appliedSettings.laneSnapSpeed).toBe(defaultGameSettings.laneSnapSpeed);
+    store.set(updateDraftSettingAtom, { key: 'laneSnapSpeed', value: 12 });
+    expect(store.get(draftSettingsAtom).laneSnapSpeed).toBe(12);
+    expect(store.get(appliedSettingsAtom).laneSnapSpeed).toBe(defaultGameSettings.laneSnapSpeed);
   });
 
   it('persists applied settings to localStorage on save', () => {
-    const store = createSettingsStore();
-
-    store.getState().updateDraftSetting('backgroundMusicVolume', 0.2);
-    store.getState().saveDraft();
-
-    expect(store.getState().appliedSettings.backgroundMusicVolume).toBe(0.2);
-    expect(localStorage.getItem('temple-run-lite.settings')).toContain('backgroundMusicVolume');
+    store.set(updateDraftSettingAtom, { key: 'backgroundMusicVolume', value: 0.2 });
+    store.set(saveDraftAtom);
+    expect(store.get(appliedSettingsAtom).backgroundMusicVolume).toBe(0.2);
+    expect(localStorageMock.getItem(STORAGE_KEY)).toContain('backgroundMusicVolume');
   });
 
-  it('resets the draft back to applied values on discard', () => {
-    const store = createSettingsStore();
-
-    store.getState().updateDraftSetting('sfxVolume', 0.95);
-    store.getState().discardDraft();
-
-    expect(store.getState().draftSettings.sfxVolume).toBe(defaultGameSettings.sfxVolume);
-    expect(store.getState().isDirty).toBe(false);
+  it('resets draft back to applied values on discard', () => {
+    store.set(updateDraftSettingAtom, { key: 'sfxVolume', value: 0.95 });
+    store.set(discardDraftAtom);
+    expect(store.get(draftSettingsAtom).sfxVolume).toBe(defaultGameSettings.sfxVolume);
+    expect(store.get(isDirtyAtom)).toBe(false);
   });
 });

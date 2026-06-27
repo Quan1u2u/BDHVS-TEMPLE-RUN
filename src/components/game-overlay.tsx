@@ -1,7 +1,7 @@
 import { Box, Heading, Show, Text, VStack } from '@chakra-ui/react';
-
+import { useAtomValue } from 'jotai';
 import { GamePhase } from '../game/domain/types';
-import { useGameStore } from '../store/game-store';
+import { bootProgressAtom, bootStageAtom, phaseAtom } from '../store/atoms';
 
 const phase: Record<GamePhase, { title: string; body: string }> = {
   [GamePhase.Boot]: {
@@ -40,9 +40,11 @@ const phase: Record<GamePhase, { title: string; body: string }> = {
 };
 
 export function GameOverlay() {
-  const metrics = useGameStore((state) => state.metrics);
-  const isRunning = useGameStore((state) => state.metrics.phase === GamePhase.Running);
-  const copy = phase[metrics.phase];
+  const phaseValue = useAtomValue(phaseAtom);
+  const bootStage = useAtomValue(bootStageAtom);
+  const bootProgress = useAtomValue(bootProgressAtom);
+  const isRunning = phaseValue === GamePhase.Running;
+  const copy = phase[phaseValue];
   const shouldShowCopy = copy.title.length > 0 || copy.body.length > 0;
 
   return (
@@ -69,10 +71,10 @@ export function GameOverlay() {
               </Text>
             </>
           ) : null}
-          {metrics.phase === GamePhase.Boot ? (
+          {phaseValue === GamePhase.Boot ? (
             <Box w="full">
               <Text color="fg.muted" fontFamily="mono" fontSize="xs" textTransform="uppercase">
-                {metrics.bootStage}
+                {bootStage}
               </Text>
               <Box
                 bg="bg.muted"
@@ -84,11 +86,7 @@ export function GameOverlay() {
                 overflow="hidden"
                 w="full"
               >
-                <Box
-                  bg="colorPalette.solid"
-                  h="full"
-                  w={`${Math.round(metrics.bootProgress * 100)}%`}
-                />
+                <Box bg="colorPalette.solid" h="full" w={`${Math.round(bootProgress * 100)}%`} />
               </Box>
             </Box>
           ) : null}

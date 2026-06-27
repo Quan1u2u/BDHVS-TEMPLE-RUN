@@ -1,31 +1,38 @@
 import type { Texture } from 'pixi.js';
 import { useMemo } from 'react';
-
-import { CollectibleType, ObstacleType } from '../game/domain/types';
+import { CollectibleType, GamePhase, ObstacleType } from '../game/domain/types';
 import { laneToBoardColumn, trackOffsetToBoardY } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
-import type { GameRenderSnapshot } from '../store/game-store';
+import type { CollectibleRender, ObstacleRender } from '../store/atoms/render-atoms';
 
 interface BoardEntityLayerProps {
-  render: GameRenderSnapshot;
   tileSize: number;
   tileTexture: Texture;
   visibleRows: number;
+  phase: GamePhase;
+  obstacles: ObstacleRender[];
+  collectibles: CollectibleRender[];
+  unitsPerBoardRow: number;
 }
 
 export function BoardEntityLayer({
-  render,
   tileSize,
   tileTexture,
   visibleRows,
+  phase,
+  obstacles,
+  collectibles,
+  unitsPerBoardRow,
 }: BoardEntityLayerProps) {
   const sprites = useMemo(() => {
-    const nextSprites = [];
+    if (phase !== GamePhase.Running) return [];
 
-    for (const obstacle of render.obstacles) {
+    const nextSprites: React.ReactElement[] = [];
+
+    for (const obstacle of obstacles) {
       const column = laneToBoardColumn(obstacle.lane);
-      const row = trackOffsetToBoardY(obstacle.trackOffset, visibleRows, render.unitsPerBoardRow);
+      const row = trackOffsetToBoardY(obstacle.trackOffset, visibleRows, unitsPerBoardRow);
       nextSprites.push(
         <pixiSprite
           key={obstacle.id}
@@ -39,13 +46,9 @@ export function BoardEntityLayer({
       );
     }
 
-    for (const collectible of render.collectibles) {
+    for (const collectible of collectibles) {
       const column = laneToBoardColumn(collectible.lane);
-      const row = trackOffsetToBoardY(
-        collectible.trackOffset,
-        visibleRows,
-        render.unitsPerBoardRow,
-      );
+      const row = trackOffsetToBoardY(collectible.trackOffset, visibleRows, unitsPerBoardRow);
       nextSprites.push(
         <pixiSprite
           key={collectible.id}
@@ -60,7 +63,7 @@ export function BoardEntityLayer({
     }
 
     return nextSprites;
-  }, [render, tileSize, tileTexture, visibleRows]);
+  }, [phase, obstacles, collectibles, unitsPerBoardRow, tileSize, tileTexture, visibleRows]);
 
   return <pixiContainer cullableChildren>{sprites}</pixiContainer>;
 }

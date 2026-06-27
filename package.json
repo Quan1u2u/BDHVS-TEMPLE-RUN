@@ -25,6 +25,7 @@
     "@fontsource/bangers": "^5.2.8",
     "@mediapipe/tasks-vision": "^0.10.35",
     "@pixi/react": "^8.0.3",
+    "jotai": "^2.20.1",
     "lucide-react": "^1.21.0",
     "next-themes": "^0.4.6",
     "pixi.js": "^8.19.0",

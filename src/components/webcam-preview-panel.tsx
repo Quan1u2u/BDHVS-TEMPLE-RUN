@@ -1,8 +1,14 @@
 import { Box, Text, VStack } from '@chakra-ui/react';
+import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
-
 import type { PoseLandmark } from '@/game/domain/types';
-import { useGameStore } from '@/store/game-store';
+import {
+  previewLandmarksAtom,
+  previewStreamAtom,
+  previewVideoHeightAtom,
+  previewVideoWidthAtom,
+  trackingStatusAtom,
+} from '@/store/atoms';
 import { GameHeading } from './game-heading';
 
 const POSE_CONNECTIONS: Array<[number, number]> = [
@@ -21,16 +27,19 @@ const POSE_CONNECTIONS: Array<[number, number]> = [
 ];
 
 export function WebcamPreviewPanel() {
-  const preview = useGameStore((state) => state.preview);
-  const trackingStatus = useGameStore((state) => state.metrics.trackingStatus);
+  const stream = useAtomValue(previewStreamAtom);
+  const landmarks = useAtomValue(previewLandmarksAtom);
+  const videoWidth = useAtomValue(previewVideoWidthAtom);
+  const videoHeight = useAtomValue(previewVideoHeightAtom);
+  const trackingStatus = useAtomValue(trackingStatusAtom);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.srcObject = preview.stream;
+      videoRef.current.srcObject = stream;
     }
-  }, [preview.stream]);
+  }, [stream]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,8 +47,8 @@ export function WebcamPreviewPanel() {
       return;
     }
 
-    const width = preview.videoWidth || 320;
-    const height = preview.videoHeight || 180;
+    const width = videoWidth || 320;
+    const height = videoHeight || 180;
     canvas.width = width;
     canvas.height = height;
 
@@ -49,8 +58,8 @@ export function WebcamPreviewPanel() {
     }
 
     context.clearRect(0, 0, width, height);
-    drawPoseOverlay(context, preview.landmarks, width, height);
-  }, [preview.landmarks, preview.videoHeight, preview.videoWidth]);
+    drawPoseOverlay(context, landmarks, width, height);
+  }, [landmarks, videoHeight, videoWidth]);
 
   return (
     <VStack align="stretch" gap={2} boxSize="full" overflow="hidden" p={4}>
@@ -90,7 +99,7 @@ export function WebcamPreviewPanel() {
             width: '100%',
           }}
         />
-        {!preview.stream ? (
+        {!stream ? (
           <Box
             alignItems="center"
             bg="bg/80"

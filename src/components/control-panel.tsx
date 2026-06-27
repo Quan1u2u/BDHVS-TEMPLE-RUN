@@ -1,13 +1,14 @@
 import { Button, HStack, VStack } from '@chakra-ui/react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Camera, Pause, Play, RefreshCcw, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { gameSettingsStore } from '@/store/game-settings-store';
+import { openSettingsPanelAtom, phaseAtom } from '@/store/atoms';
 import { GamePhase } from '../game/domain/types';
 import { GameRuntime } from '../game/runtime/game-runtime';
-import { useGameStore } from '../store/game-store';
 import { GameHeading } from './game-heading';
 
 export function ControlPanel() {
-  const phase = useGameStore((state) => state.metrics.phase);
+  const phase = useAtomValue(phaseAtom);
+  const openSettingsPanel = useSetAtom(openSettingsPanelAtom);
 
   return (
     <VStack boxSize="full" p={4} gap={2} align="start" h={52}>
@@ -60,7 +61,7 @@ export function ControlPanel() {
         <Button
           variant="subtle"
           onClick={() => {
-            gameSettingsStore.getState().openPanel();
+            openSettingsPanel();
           }}
         >
           <SlidersHorizontal size={16} />

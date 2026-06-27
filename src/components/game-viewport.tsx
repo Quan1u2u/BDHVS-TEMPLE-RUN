@@ -3,26 +3,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { computeTileSize, computeVisibleRows } from '../game/rendering/grid-layout';
 import { GameRuntime } from '../game/runtime/game-runtime';
-import { useGameStore } from '../store/game-store';
-import { createMetricsSink } from '../store/game-store-bridge';
+import { createMetricsSink } from '../store/atoms/sink';
 import { GameStageScene } from './game-stage-scene';
 
 export function GameViewport() {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const metricsSink = useMemo(() => createMetricsSink(), []);
-  const render = useGameStore((state) => state.render);
-  const phase = useGameStore((state) => state.metrics.phase);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const host = hostRef.current;
-
-    if (!host) {
-      return;
-    }
-
+    if (!host) return;
     void GameRuntime.bootstrap(host, metricsSink);
-
     return () => {
       void GameRuntime.destroy();
     };
@@ -30,27 +22,13 @@ export function GameViewport() {
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host) {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) {
-        return;
-      }
-
-      setSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      });
+    if (!host) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
     });
-
-    resizeObserver.observe(host);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
+    observer.observe(host);
+    return () => observer.disconnect();
   }, []);
 
   const tileSize = size.width > 0 ? computeTileSize(size.width) : 0;
@@ -67,8 +45,6 @@ export function GameViewport() {
         <GameStageScene
           width={size.width}
           height={size.height}
-          phase={phase}
-          render={render}
           tileSize={tileSize}
           visibleRows={visibleRows}
         />

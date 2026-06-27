@@ -1,9 +1,16 @@
+import { getDefaultStore } from 'jotai/vanilla';
 import { toaster } from '@/components/ui/toaster';
 import { soundEngine } from '@/sound-engine';
-import { openGameOverDialog } from '@/store/game-over-store';
-import { getAppliedGameSettings } from '@/store/game-settings-store';
-import { gameStore } from '@/store/game-store';
-import type { MetricsSink } from '../../store/game-store-bridge';
+import { openGameOverDialog } from '@/store/atoms/game-over-atoms';
+import {
+  previewLandmarksAtom,
+  previewStreamAtom,
+  previewVideoHeightAtom,
+  previewVideoWidthAtom,
+} from '@/store/atoms/preview-atoms';
+import { renderErrorAtom } from '@/store/atoms/render-atoms';
+import { getAppliedGameSettings } from '@/store/atoms/settings-atoms';
+import type { MetricsSink } from '../../store/atoms/sink';
 import { AssetPipeline } from '../assets/asset-pipeline';
 import {
   GamePhase,
@@ -350,7 +357,7 @@ export class GameRuntime {
 
     const { world } = GameRuntime.context;
     const speedFactor = world.speed / Math.max(world.settings.baseRunSpeed, 1);
-    const renderError = gameStore.getState().render.renderError;
+    const renderError = getDefaultStore().get(renderErrorAtom);
     GameRuntime.context.metricsSink.publish({
       score: world.score,
       distance: world.distance,
@@ -408,12 +415,11 @@ export class GameRuntime {
     if (world.phase !== GamePhase.GameOver) {
       world.phase = mapTrackingStatusToPhase(status.trackingStatus, world.phase);
     }
-    gameStore.getState().setPreview({
-      stream: status.stream,
-      landmarks: status.landmarks,
-      videoWidth: status.videoWidth,
-      videoHeight: status.videoHeight,
-    });
+    const store = getDefaultStore();
+    store.set(previewStreamAtom, status.stream);
+    store.set(previewLandmarksAtom, status.landmarks);
+    store.set(previewVideoWidthAtom, status.videoWidth);
+    store.set(previewVideoHeightAtom, status.videoHeight);
 
     if (status.trackingStatus === 'tracking') {
       void soundEngine.resume();

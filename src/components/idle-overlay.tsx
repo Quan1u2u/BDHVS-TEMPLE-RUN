@@ -1,4 +1,5 @@
 import { Box, Heading, HStack, Image, Text, VStack } from '@chakra-ui/react';
+import { useAtomValue } from 'jotai';
 import { CollectibleType, GamePhase, ObstacleType } from '../game/domain/types';
 import {
   getTileFrame,
@@ -8,7 +9,7 @@ import {
   TILESHEET_ROWS,
   TileId,
 } from '../game/tiles/tile-atlas';
-import { useGameStore } from '../store/game-store';
+import { phaseAtom } from '../store/atoms';
 
 const idlePhases = new Set<GamePhase>([GamePhase.CameraPermission, GamePhase.GameOver]);
 const spriteSheetWidthPx = TILESHEET_COLUMNS * TILE_SIZE_PX;
@@ -32,7 +33,7 @@ const obstacleLegend = [
 ] as const;
 
 export function IdleOverlay() {
-  const phase = useGameStore((state) => state.metrics.phase);
+  const phase = useAtomValue(phaseAtom);
 
   if (!idlePhases.has(phase)) {
     return null;

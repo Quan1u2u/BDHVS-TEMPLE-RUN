@@ -1,6 +1,6 @@
 import type { Texture } from 'pixi.js';
 import { useMemo } from 'react';
-
+import { GamePhase } from '../game/domain/types';
 import { buildBoardRowTiles } from '../game/rendering/board-tiles';
 import {
   BOARD_COLUMNS,
@@ -10,34 +10,39 @@ import {
 } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
-import type { GameRenderSnapshot } from '../store/game-store';
+import type { BlockedRowRender } from '../store/atoms/render-atoms';
 
 interface BoardFloorLayerProps {
-  render: GameRenderSnapshot;
   tileSize: number;
   tileTexture: Texture;
   visibleRows: number;
+  phase: GamePhase;
+  boardScrollOffsetRows: number;
+  blockedRows: BlockedRowRender[];
+  unitsPerBoardRow: number;
 }
 
 export function BoardFloorLayer({
-  render,
   tileSize,
   tileTexture,
   visibleRows,
+  phase,
+  boardScrollOffsetRows,
+  blockedRows,
+  unitsPerBoardRow,
 }: BoardFloorLayerProps) {
   const sprites = useMemo(() => {
-    const nextSprites = [];
-    const { baseRow, rowOffset } = splitBoardScrollOffset(render.boardScrollOffsetRows);
+    if (phase === GamePhase.Boot) return [];
+
+    const nextSprites: React.ReactElement[] = [];
+    const { baseRow, rowOffset } = splitBoardScrollOffset(boardScrollOffsetRows);
 
     for (let row = -FLOOR_BUFFER_ROWS; row < visibleRows + FLOOR_BUFFER_ROWS; row += 1) {
       const boardRow = baseRow + row;
       const rowTiles = buildBoardRowTiles(boardRow);
       for (let column = 0; column < BOARD_COLUMNS; column += 1) {
         const tileId = rowTiles[column];
-        if (tileId === undefined) {
-          continue;
-        }
-
+        if (tileId === undefined) continue;
         nextSprites.push(
           <pixiSprite
             key={`floor-${row}-${column}-${tileId}`}
@@ -52,8 +57,8 @@ export function BoardFloorLayer({
       }
     }
 
-    for (const blockedRow of render.blockedRows) {
-      const y = trackOffsetToBoardY(blockedRow.trackOffset, visibleRows, render.unitsPerBoardRow);
+    for (const blockedRow of blockedRows) {
+      const y = trackOffsetToBoardY(blockedRow.trackOffset, visibleRows, unitsPerBoardRow);
       for (const column of blockedRow.blockedColumns) {
         nextSprites.push(
           <pixiSprite
@@ -70,7 +75,15 @@ export function BoardFloorLayer({
     }
 
     return nextSprites;
-  }, [render, tileSize, tileTexture, visibleRows]);
+  }, [
+    phase,
+    boardScrollOffsetRows,
+    blockedRows,
+    unitsPerBoardRow,
+    tileSize,
+    tileTexture,
+    visibleRows,
+  ]);
 
   return <pixiContainer cullableChildren>{sprites}</pixiContainer>;
 }

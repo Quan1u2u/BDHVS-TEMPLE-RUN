@@ -28,15 +28,18 @@ The game lifecycle is centralized in static modules so the hot path avoids React
 
 Data remains plain and serializable. The architecture aims for low overhead without turning the codebase into a bundle of hidden mutable state.
 
-### Zustand mirrors metrics instead of owning the simulation
+### Jotai drives surgical UI subscriptions
 
-The game simulation is authoritative inside the runtime. Zustand receives selected snapshots so React can subscribe to exactly what it needs.
+The game simulation is authoritative inside the runtime. A `MetricsSink` pushes fine-grained atoms from the runtime to Jotai's default store each frame. React and Pixi components subscribe to exactly the atoms they need — no more, no less.
 
 That gives us:
 
-- minimal re-renders for DOM HUD/debug surfaces
-- a stable seam between gameplay and UI
-- room for manual selector-based optimization where helpful
+- zero unnecessary re-renders: a score change does not re-render the FPS display
+- a stable seam between gameplay and UI via the `MetricsSink` interface
+- ~33 individual atoms across metrics, render, preview, settings, and dialog state
+- `atomWithStorage` for automatic localStorage persistence of game settings
+
+The runtime writes to individual atoms via `getDefaultStore().set(atom, value)` — no store object, no action dispatch, no selector memoization.
 
 ### MediaPipe is wrapped behind an adapter
 
@@ -67,7 +70,7 @@ The setup is rock-solid and ready for customizations, as everything is split dow
 - `src/game/rendering`: Pixi renderer adapter
 - `src/game/input`: MediaPipe Tasks integration and pose classification
 - `src/game/assets`: typed asset manifest and pipeline
-- `src/store`: Zustand store and runtime metrics bridge
+- `src/store`: Jotai atoms and runtime metrics bridge
 
 ## Tooling choices
 

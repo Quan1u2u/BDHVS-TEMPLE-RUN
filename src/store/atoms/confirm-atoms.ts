@@ -1,23 +1,16 @@
-import { create } from 'zustand';
+import { atom } from 'jotai';
+import { getDefaultStore } from 'jotai/vanilla';
 
-interface ConfirmActionPayload {
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-}
-
-interface ConfirmActionStore {
+interface ConfirmState {
   open: boolean;
   title: string;
   message: string;
   confirmLabel: string;
   cancelLabel: string;
   resolve: ((value: boolean) => void) | null;
-  reset: () => void;
 }
 
-const initialState = {
+const initialState: ConfirmState = {
   open: false,
   title: '',
   message: '',
@@ -26,14 +19,19 @@ const initialState = {
   resolve: null,
 };
 
-export const useConfirmActionStore = create<ConfirmActionStore>((set) => ({
-  ...initialState,
-  reset: () => set(initialState),
-}));
+export const confirmStateAtom = atom<ConfirmState>(initialState);
+
+export interface ConfirmActionPayload {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+}
 
 export function confirmAction(payload: ConfirmActionPayload): Promise<boolean> {
   return new Promise((resolve) => {
-    useConfirmActionStore.setState({
+    const store = getDefaultStore();
+    store.set(confirmStateAtom, {
       open: true,
       title: payload.title,
       message: payload.message,
@@ -44,8 +42,9 @@ export function confirmAction(payload: ConfirmActionPayload): Promise<boolean> {
   });
 }
 
-export function resolveConfirmAction(ok: boolean) {
-  const state = useConfirmActionStore.getState();
+export function resolveConfirmAction(ok: boolean): void {
+  const store = getDefaultStore();
+  const state = store.get(confirmStateAtom);
   state.resolve?.(ok);
-  state.reset();
+  store.set(confirmStateAtom, { ...initialState });
 }

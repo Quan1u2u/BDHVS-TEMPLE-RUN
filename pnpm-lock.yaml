@@ -29,6 +29,9 @@ importers:
       '@pixi/react':
         specifier: ^8.0.3
         version: 8.0.5(@types/react@19.2.17)(pixi.js@8.19.0)(react@19.2.7)
+      jotai:
+        specifier: ^2.20.1
+        version: 2.20.1(@babel/template@7.29.7)(@types/react@19.2.17)(react@19.2.7)
       lucide-react:
         specifier: ^1.21.0
         version: 1.21.0(react@19.2.7)
@@ -1020,6 +1023,24 @@ packages:
     resolution: {integrity: sha512-KLViCmWx94zOvpLwSlsx6yOCeMhZYaxrJV87Po5k/FoZzcPSahvK5qJ7fYhS61sZi5ikmh2S3Hz55A2l3U69ng==}
     peerDependencies:
       react: ^19.0.0
+
+  jotai@2.20.1:
+    resolution: {integrity: sha512-dnuKfU/GLi8B28RRMjQ3AfoN7kfzP8o41+AX2FmITZqEMY8PHnjABq+VkEooomLwYaGjda+pgy0yFSjaHX/ZPg==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@babel/core': '>=7.0.0'
+      '@babel/template': '>=7.0.0'
+      '@types/react': '>=17.0.0'
+      react: '>=17.0.0'
+    peerDependenciesMeta:
+      '@babel/core':
+        optional: true
+      '@babel/template':
+        optional: true
+      '@types/react':
+        optional: true
+      react:
+        optional: true
 
   js-binary-schema-parser@2.0.3:
     resolution: {integrity: sha512-xezGJmOb4lk/M1ZZLTR/jaBHQ4gG/lqQnJqdIv4721DMggsa1bDVlHXNeHYogaIEHD9vCRv0fcL4hMA+Coarkg==}
@@ -2755,6 +2776,12 @@ snapshots:
       react: 19.2.7
     transitivePeerDependencies:
       - '@types/react'
+
+  jotai@2.20.1(@babel/template@7.29.7)(@types/react@19.2.17)(react@19.2.7):
+    optionalDependencies:
+      '@babel/template': 7.29.7
+      '@types/react': 19.2.17
+      react: 19.2.7
 
   js-binary-schema-parser@2.0.3: {}
 

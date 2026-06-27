@@ -12,10 +12,22 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react';
+import { useAtomValue } from 'jotai';
 import { Camera, Gauge, Heart, Move3D, Notebook, Trophy } from 'lucide-react';
 import type { ReactNode } from 'react';
-
-import { useGameStore } from '../store/game-store';
+import {
+  calibrationProgressAtom,
+  debugMessageAtom,
+  distanceAtom,
+  fpsAtom,
+  laneAtom,
+  livesAtom,
+  phaseAtom,
+  poseCommandAtom,
+  scoreAtom,
+  speedAtom,
+  trackingStatusAtom,
+} from '../store/atoms';
 import { GameHeading } from './game-heading';
 
 function MetricCard({
@@ -45,28 +57,34 @@ function MetricCard({
 }
 
 export function HudPanel() {
-  const metrics = useGameStore((state) => state.metrics);
+  const score = useAtomValue(scoreAtom);
+  const speed = useAtomValue(speedAtom);
+  const distance = useAtomValue(distanceAtom);
+  const lives = useAtomValue(livesAtom);
+  const phase = useAtomValue(phaseAtom);
+  const trackingStatus = useAtomValue(trackingStatusAtom);
+  const calibrationProgress = useAtomValue(calibrationProgressAtom);
+  const debugMessage = useAtomValue(debugMessageAtom);
+  const poseCommand = useAtomValue(poseCommandAtom);
+  const lane = useAtomValue(laneAtom);
+  const fps = useAtomValue(fpsAtom);
 
   return (
     <VStack align="stretch" boxSize="full" gap={4} p={4}>
       <Flex align="center" justify="space-between">
         <GameHeading>Các chỉ số</GameHeading>
-        <Badge textTransform="capitalize">{metrics.phase}</Badge>
+        <Badge textTransform="capitalize">{phase}</Badge>
       </Flex>
 
       <Grid gap={3} templateColumns={{ base: '1fr 1fr', md: 'repeat(2, 1fr)' }}>
-        <MetricCard icon={<Trophy size={16} />} label="ĐIỂM" value={metrics.score.toString()} />
-        <MetricCard
-          icon={<Gauge size={16} />}
-          label="TỐC ĐỘ"
-          value={`${metrics.speed.toFixed(2)}x`}
-        />
+        <MetricCard icon={<Trophy size={16} />} label="ĐIỂM" value={score.toString()} />
+        <MetricCard icon={<Gauge size={16} />} label="TỐC ĐỘ" value={`${speed.toFixed(2)}x`} />
         <MetricCard
           icon={<Move3D size={16} />}
           label="Khoảng cách"
-          value={`${Math.floor(metrics.distance)}m`}
+          value={`${Math.floor(distance)}m`}
         />
-        <MetricCard icon={<Heart size={16} />} label="Trái tim" value={metrics.lives.toString()} />
+        <MetricCard icon={<Heart size={16} />} label="Trái tim" value={lives.toString()} />
       </Grid>
 
       <Box>
@@ -78,15 +96,15 @@ export function HudPanel() {
                 AI
               </Text>
             </HStack>
-            <Badge textTransform="capitalize">{metrics.trackingStatus}</Badge>
+            <Badge textTransform="capitalize">{trackingStatus}</Badge>
           </HStack>
-          <Progress.Root maxW="full" value={metrics.calibrationProgress * 100}>
+          <Progress.Root maxW="full" value={calibrationProgress * 100}>
             <Progress.Track bg="bg.muted" borderRadius="full">
               <Progress.Range bg="colorPalette.solid" borderRadius="full" />
             </Progress.Track>
           </Progress.Root>
           <Text color="fg.muted" fontSize="sm">
-            {metrics.debugMessage}
+            {debugMessage}
           </Text>
           <HStack
             color="fg.muted"
@@ -95,9 +113,9 @@ export function HudPanel() {
             fontFamily="mono"
             fontVariant="tabular-nums"
           >
-            <Text>Pose: {metrics.poseCommand}</Text>
-            <Text>Lane: {metrics.lane}</Text>
-            <Text>{metrics.fps} FPS</Text>
+            <Text>Pose: {poseCommand}</Text>
+            <Text>Lane: {lane}</Text>
+            <Text>{fps} FPS</Text>
           </HStack>
         </VStack>
       </Box>

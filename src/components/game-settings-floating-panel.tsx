@@ -9,11 +9,20 @@ import {
   Portal,
   Text,
 } from '@chakra-ui/react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { GripHorizontal, X } from 'lucide-react';
 import type { GameSettings } from '@/game/config';
 import { GameRuntime } from '@/game/runtime/game-runtime';
-import { confirmAction } from '@/store/confirm-action-store';
-import { gameSettingsStore, useGameSettingsStore } from '@/store/game-settings-store';
+import {
+  confirmAction,
+  discardDraftAtom,
+  draftSettingsAtom,
+  isDirtyAtom,
+  isSettingsPanelOpenAtom,
+  openSettingsPanelAtom,
+  saveDraftAtom,
+  updateDraftSettingAtom,
+} from '@/store/atoms';
 
 interface SettingField {
   key: keyof GameSettings;
@@ -56,8 +65,10 @@ const settingFields: SettingField[] = [
 ];
 
 export function GameSettingsFloatingPanel() {
-  const isOpen = useGameSettingsStore((state) => state.isPanelOpen);
-  const isDirty = useGameSettingsStore((state) => state.isDirty);
+  const isOpen = useAtomValue(isSettingsPanelOpenAtom);
+  const isDirty = useAtomValue(isDirtyAtom);
+  const openSettingsPanel = useSetAtom(openSettingsPanelAtom);
+  const saveDraft = useSetAtom(saveDraftAtom);
 
   return (
     <FloatingPanel.Root
@@ -69,10 +80,9 @@ export function GameSettingsFloatingPanel() {
       open={isOpen}
       onOpenChange={({ open }) => {
         if (open) {
-          gameSettingsStore.getState().openPanel();
+          openSettingsPanel();
           return;
         }
-
         void handleCloseRequest();
       }}
     >
@@ -109,20 +119,14 @@ export function GameSettingsFloatingPanel() {
                   </Text>
 
                   <HStack h={8}>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        void handleDiscardRequest();
-                      }}
-                    >
+                    <Button size="sm" variant="outline" onClick={handleDiscardRequest}>
                       Discard
                     </Button>
                     <Button
                       colorPalette="blue"
                       size="sm"
                       onClick={() => {
-                        gameSettingsStore.getState().saveDraft();
+                        saveDraft();
                         GameRuntime.applySettingsAndRestart();
                       }}
                     >
@@ -142,8 +146,8 @@ export function GameSettingsFloatingPanel() {
 }
 
 function SettingsInput({ field }: { field: SettingField }) {
-  const draftSettings = useGameSettingsStore((state) => state.draftSettings);
-  const updateDraftSetting = useGameSettingsStore((state) => state.updateDraftSetting);
+  const draftSettings = useAtomValue(draftSettingsAtom);
+  const updateDraft = useSetAtom(updateDraftSettingAtom);
   return (
     <Field.Root orientation="horizontal" minW={32} gap={4}>
       <Field.Label>{field.label}</Field.Label>
@@ -155,7 +159,7 @@ function SettingsInput({ field }: { field: SettingField }) {
         type="number"
         value={draftSettings[field.key]}
         onChange={(event) => {
-          updateDraftSetting(field.key, Number(event.currentTarget.value));
+          updateDraft({ key: field.key, value: Number(event.currentTarget.value) });
         }}
       />
     </Field.Root>
@@ -163,17 +167,18 @@ function SettingsInput({ field }: { field: SettingField }) {
 }
 
 async function handleCloseRequest(): Promise<void> {
-  if (!gameSettingsStore.getState().isDirty) {
-    gameSettingsStore.getState().closePanel();
+  const store = (await import('jotai/vanilla')).getDefaultStore();
+  if (!store.get(isDirtyAtom)) {
+    store.set(isSettingsPanelOpenAtom, false);
     return;
   }
-
   await handleDiscardRequest();
 }
 
 async function handleDiscardRequest(): Promise<void> {
-  if (!gameSettingsStore.getState().isDirty) {
-    gameSettingsStore.getState().discardDraft();
+  const store = (await import('jotai/vanilla')).getDefaultStore();
+  if (!store.get(isDirtyAtom)) {
+    store.set(discardDraftAtom);
     return;
   }
 
@@ -185,6 +190,6 @@ async function handleDiscardRequest(): Promise<void> {
   });
 
   if (shouldDiscard) {
-    gameSettingsStore.getState().discardDraft();
+    store.set(discardDraftAtom);
   }
 }
