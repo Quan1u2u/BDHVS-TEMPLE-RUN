@@ -38,9 +38,13 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
+          // Lower resolution to improve performance
           width: 960,
           height: 540,
-          facingMode: 'user',
+          facingMode: {
+            exact: 'user',
+          },
+          aspectRatio: 16 / 9,
         },
         audio: false,
       });

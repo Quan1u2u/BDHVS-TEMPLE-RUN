@@ -56,10 +56,12 @@ export function classifyPose(
 
   if (handsUp || noseRise > JUMP_THRESHOLD) {
     command = PoseCommand.Jump;
-  } else if (emaTilt < -LEAN_DEADZONE) {
-    command = PoseCommand.MoveLeft;
-  } else if (emaTilt > LEAN_DEADZONE) {
+  }
+  // Flipping the behavior here: the user is facing towards the camera
+  else if (emaTilt < -LEAN_DEADZONE) {
     command = PoseCommand.MoveRight;
+  } else if (emaTilt > LEAN_DEADZONE) {
+    command = PoseCommand.MoveLeft;
   }
 
   return {
