@@ -78,4 +78,5 @@ export interface WorldRuntimeState {
   obstacleSpawnCooldownMs: number;
   collectibleSpawnCooldownMs: number;
   blockerSpawnCooldownMs: number;
+  idleScroll: number;
 }

@@ -49,8 +49,8 @@ export function IdleOverlay() {
       flexDirection="column"
       justifyContent="center"
       alignItems="center"
-      backdropFilter="blur(4px)"
-      bg="rgba(0, 0, 0, 0.3)"
+      backdropFilter="blur(6px)"
+      bg="rgba(0, 0, 0, 0.7)"
       color="white"
       zIndex={1}
     >

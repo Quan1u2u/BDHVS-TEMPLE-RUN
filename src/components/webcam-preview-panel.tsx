@@ -62,7 +62,7 @@ export function WebcamPreviewPanel() {
         borderStyle="dashed"
         borderWidth={2}
         aspectRatio="16 / 9"
-        h={40}
+        h="50%"
         w="fit"
         overflow="hidden"
         position="relative"
@@ -101,7 +101,7 @@ export function WebcamPreviewPanel() {
             justifyContent="center"
             position="absolute"
           >
-            Camera preview will appear here
+            Camera preview
           </Box>
         ) : null}
       </Box>

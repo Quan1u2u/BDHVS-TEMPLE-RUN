@@ -33,6 +33,7 @@ export function createInitialWorld(settings: GameSettings): WorldRuntimeState {
     obstacleSpawnCooldownMs: settings.obstacleSpawnCooldownMs,
     collectibleSpawnCooldownMs: settings.collectibleSpawnCooldownMs,
     blockerSpawnCooldownMs: settings.obstacleSpawnCooldownMs * 1.5,
+    idleScroll: 0,
   };
 }
 

@@ -79,7 +79,7 @@ export function GameStageScene({
       sharedTicker={false}
     >
       <pixiContainer cullableChildren>
-        {tileTexture && phase !== GamePhase.CameraPermission && phase !== GamePhase.GameOver ? (
+        {tileTexture && phase !== GamePhase.Boot ? (
           <>
             <BoardFloorLayer
               render={render}
@@ -87,12 +87,14 @@ export function GameStageScene({
               tileTexture={tileTexture}
               visibleRows={visibleRows}
             />
-            <BoardEntityLayer
-              render={render}
-              tileSize={tileSize}
-              tileTexture={tileTexture}
-              visibleRows={visibleRows}
-            />
+            {phase === GamePhase.Running ? (
+              <BoardEntityLayer
+                render={render}
+                tileSize={tileSize}
+                tileTexture={tileTexture}
+                visibleRows={visibleRows}
+              />
+            ) : null}
           </>
         ) : null}
         <PlayerLayer

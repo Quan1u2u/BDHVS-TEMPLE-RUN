@@ -30,7 +30,6 @@ export function App() {
             </Heading>
           </HStack>
           <Separator w="full" />
-          {/* TODO: Fix the game */}
           <Box position="relative" boxSize="full">
             <GameViewport />
             <IdleOverlay />
@@ -40,7 +39,7 @@ export function App() {
 
         <Separator orientation="vertical" h="full" />
 
-        <Grid templateRows="auto auto 1fr auto 1fr" boxSize="full">
+        <Grid templateRows="auto auto auto auto 1fr" boxSize="full">
           <HudPanel />
           <Separator w="full" />
           <ControlPanel />

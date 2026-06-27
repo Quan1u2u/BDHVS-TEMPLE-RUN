@@ -9,6 +9,8 @@ export interface PoseClassifierState {
   baseNoseX: number | null;
   baseNoseY: number | null;
   emaTilt: number;
+  // Idea: the user must center/lean to a different direction. We don't want same-direction-spamming
+  lastLeanDirection: 'left' | 'right' | null;
 }
 
 export interface PoseClassificationResult {
@@ -26,6 +28,7 @@ export function createInitialPoseClassifierState(): PoseClassifierState {
     baseNoseX: null,
     baseNoseY: null,
     emaTilt: 0,
+    lastLeanDirection: null,
   };
 }
 
@@ -53,15 +56,23 @@ export function classifyPose(
     Boolean(rightWrist && rightWrist.y < rightShoulder.y - HANDS_UP_THRESHOLD);
 
   let command = PoseCommand.Idle;
+  let lastLeanDirection = state.lastLeanDirection;
 
   if (handsUp || noseRise > JUMP_THRESHOLD) {
     command = PoseCommand.Jump;
-  }
-  // Flipping the behavior here: the user is facing towards the camera
-  else if (emaTilt < -LEAN_DEADZONE) {
-    command = PoseCommand.MoveRight;
+    lastLeanDirection = null;
+  } else if (emaTilt < -LEAN_DEADZONE) {
+    if (lastLeanDirection !== 'right') {
+      command = PoseCommand.MoveRight;
+      lastLeanDirection = 'right';
+    }
   } else if (emaTilt > LEAN_DEADZONE) {
-    command = PoseCommand.MoveLeft;
+    if (lastLeanDirection !== 'left') {
+      command = PoseCommand.MoveLeft;
+      lastLeanDirection = 'left';
+    }
+  } else {
+    lastLeanDirection = null;
   }
 
   return {
@@ -70,6 +81,7 @@ export function classifyPose(
       baseNoseX: baseNoseX * 0.98 + nose.x * 0.02,
       baseNoseY: baseNoseY * 0.98 + nose.y * 0.02,
       emaTilt,
+      lastLeanDirection,
     },
   };
 }

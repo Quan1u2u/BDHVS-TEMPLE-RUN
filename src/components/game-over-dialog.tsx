@@ -21,7 +21,13 @@ export function GameOverDialog() {
             </Dialog.Body>
             <Dialog.Footer gap={3}>
               <Dialog.ActionTrigger asChild>
-                <Button variant="outline" onClick={close}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    close();
+                    GameRuntime.resetToIdle();
+                  }}
+                >
                   Đóng
                 </Button>
               </Dialog.ActionTrigger>

@@ -1,13 +1,5 @@
 import { Button, HStack, VStack } from '@chakra-ui/react';
-import {
-  Camera,
-  Keyboard,
-  Pause,
-  Play,
-  RefreshCcw,
-  RotateCcw,
-  SlidersHorizontal,
-} from 'lucide-react';
+import { Camera, Pause, Play, RefreshCcw, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { gameSettingsStore } from '@/store/game-settings-store';
 import { GamePhase } from '../game/domain/types';
 import { GameRuntime } from '../game/runtime/game-runtime';
@@ -18,7 +10,7 @@ export function ControlPanel() {
   const phase = useGameStore((state) => state.metrics.phase);
 
   return (
-    <VStack boxSize="full" p={4} gap={2} align="start">
+    <VStack boxSize="full" p={4} gap={2} align="start" h={52}>
       <GameHeading>Điều khiển game</GameHeading>
 
       <HStack
@@ -26,7 +18,7 @@ export function ControlPanel() {
         gap={2}
         css={{
           '& > button': {
-            w: 48,
+            w: 36,
           },
         }}
       >
@@ -49,12 +41,13 @@ export function ControlPanel() {
           Recalibrate AI
         </Button>
         <Button
+          colorPalette="green"
           onClick={() => {
-            void GameRuntime.startKeyboardRun();
+            void GameRuntime.startGame();
           }}
         >
-          <Keyboard size={16} />
-          Chơi bằng bàn phím
+          <Play size={16} />
+          Bắt đầu game
         </Button>
         <Button onClick={() => GameRuntime.togglePause()}>
           {phase === GamePhase.Paused ? <Play size={16} /> : <Pause size={16} />}
@@ -71,7 +64,7 @@ export function ControlPanel() {
           }}
         >
           <SlidersHorizontal size={16} />
-          Điều chỉnh thông số
+          Thông số
         </Button>
       </HStack>
     </VStack>

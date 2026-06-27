@@ -139,10 +139,14 @@ export class GameRuntime {
 
     await soundEngine.unlockAudio();
 
-    if (!GameRuntime.context.poseProvider) {
-      GameRuntime.context.poseProvider = new MediaPipePoseProvider();
+    if (GameRuntime.context.poseProvider) {
+      GameRuntime.context.world.phase = GamePhase.CameraPermission;
+      GameRuntime.context.world.debugMessage = 'Camera already active';
+      GameRuntime.publishMetrics();
+      return;
     }
 
+    GameRuntime.context.poseProvider = new MediaPipePoseProvider();
     GameRuntime.context.world.phase = GamePhase.CameraPermission;
     GameRuntime.context.world.debugMessage = 'Starting camera tracking';
     GameRuntime.publishMetrics();
@@ -162,16 +166,9 @@ export class GameRuntime {
     } catch {
       GameRuntime.context.world.cameraEnabled = false;
       GameRuntime.context.world.trackingStatus = 'error';
-      GameRuntime.context.world.debugMessage = 'Camera startup failed; keyboard fallback active';
-      GameRuntime.context.world.phase = GamePhase.Running;
+      GameRuntime.context.world.debugMessage = 'Camera startup failed';
+      GameRuntime.context.world.phase = GamePhase.CameraPermission;
       GameRuntime.publishMetrics();
-      GameRuntime.startKeyboardRun();
-      return;
-    }
-
-    if (!GameRuntime.context.world.cameraEnabled) {
-      GameRuntime.context.world.debugMessage = 'Camera unavailable; keyboard fallback active';
-      void GameRuntime.startKeyboardRun();
     }
   }
 
@@ -190,14 +187,14 @@ export class GameRuntime {
     await GameRuntime.enableCameraTracking();
   }
 
-  public static async startKeyboardRun(): Promise<void> {
+  public static async startGame(): Promise<void> {
     if (!GameRuntime.context) {
       return;
     }
 
     await soundEngine.unlockAudio();
     GameRuntime.context.world.phase = GamePhase.Running;
-    GameRuntime.context.world.debugMessage = 'Keyboard fallback active';
+    GameRuntime.context.world.debugMessage = 'Game started';
     await soundEngine.resume();
     if (soundEngine.isBackgroundMusicPaused()) {
       await soundEngine.resumeBackgroundMusic();
@@ -207,13 +204,18 @@ export class GameRuntime {
     GameRuntime.publishMetrics();
   }
 
+  /** @deprecated Use startGame() instead */
+  public static async startKeyboardRun(): Promise<void> {
+    await GameRuntime.startGame();
+  }
+
   public static togglePause(): void {
     if (!GameRuntime.context) {
       return;
     }
 
     const world = GameRuntime.context.world;
-    if (world.phase === GamePhase.GameOver) {
+    if (world.phase !== GamePhase.Running && world.phase !== GamePhase.Paused) {
       return;
     }
 
@@ -235,18 +237,30 @@ export class GameRuntime {
     }
 
     const replacement = createInitialWorld(getAppliedGameSettings());
-    replacement.phase = GameRuntime.context.world.cameraEnabled
-      ? GamePhase.Running
-      : GamePhase.CameraPermission;
+    replacement.phase = GamePhase.Running;
     replacement.cameraEnabled = GameRuntime.context.world.cameraEnabled;
     replacement.trackingStatus = GameRuntime.context.world.trackingStatus;
-    replacement.debugMessage = replacement.cameraEnabled
-      ? 'Restarted with live tracking'
-      : 'Restarted in standby';
+    replacement.debugMessage = 'Restarted';
 
     GameRuntime.context.world = replacement;
     soundEngine.applyMix(replacement.settings);
     GameRuntime.ensureBackgroundMusic(true);
+    GameRuntime.publishMetrics();
+  }
+
+  public static resetToIdle(): void {
+    if (!GameRuntime.context) {
+      return;
+    }
+
+    const replacement = createInitialWorld(getAppliedGameSettings());
+    replacement.phase = GamePhase.CameraPermission;
+    replacement.debugMessage = '';
+    replacement.cameraEnabled = GameRuntime.context.world.cameraEnabled;
+    replacement.trackingStatus = GameRuntime.context.world.trackingStatus;
+
+    GameRuntime.context.world = replacement;
+    soundEngine.stopBackgroundMusic();
     GameRuntime.publishMetrics();
   }
 
@@ -299,6 +313,15 @@ export class GameRuntime {
           closable: true,
         });
       }
+    } else if (
+      GameRuntime.context.world.phase === GamePhase.CameraPermission ||
+      GameRuntime.context.world.phase === GamePhase.GameOver
+    ) {
+      const { settings } = GameRuntime.context.world;
+      const deltaSeconds = deltaMs / 1000;
+      GameRuntime.context.world.idleScroll +=
+        settings.baseRunSpeed * deltaSeconds * settings.distanceScale;
+      GameRuntime.context.world.elapsedMs += deltaMs;
     }
 
     GameRuntime.context.pendingAction = PlayerAction.None;
@@ -346,7 +369,8 @@ export class GameRuntime {
     });
     GameRuntime.context.metricsSink.publishRenderState({
       playerLane: Math.round(world.player.currentLane) as Lane,
-      boardScrollOffsetRows: world.distance / Math.max(1, world.settings.obstacleWidth),
+      boardScrollOffsetRows:
+        (world.distance + world.idleScroll) / Math.max(1, world.settings.obstacleWidth),
       unitsPerBoardRow: world.settings.obstacleWidth,
       blockedRows: world.blockedRows.map((blockedRow) => ({
         id: blockedRow.id,
@@ -381,7 +405,9 @@ export class GameRuntime {
     world.cameraEnabled = status.cameraEnabled;
     world.debugMessage = status.debugMessage;
     world.poseLandmarks = status.landmarks;
-    world.phase = mapTrackingStatusToPhase(status.trackingStatus, world.phase);
+    if (world.phase !== GamePhase.GameOver) {
+      world.phase = mapTrackingStatusToPhase(status.trackingStatus, world.phase);
+    }
     gameStore.getState().setPreview({
       stream: status.stream,
       landmarks: status.landmarks,
@@ -391,7 +417,6 @@ export class GameRuntime {
 
     if (status.trackingStatus === 'tracking') {
       void soundEngine.resume();
-      GameRuntime.ensureBackgroundMusic();
     }
 
     GameRuntime.publishMetrics();
@@ -441,6 +466,9 @@ export class GameRuntime {
       }
 
       switch (event.key) {
+        case 'Escape':
+          GameRuntime.togglePause();
+          return;
         case 'ArrowLeft':
         case 'a':
         case 'A':
@@ -453,10 +481,6 @@ export class GameRuntime {
           break;
         default:
           return;
-      }
-
-      if (GameRuntime.context.world.phase === GamePhase.CameraPermission) {
-        void GameRuntime.startKeyboardRun();
       }
     };
 
@@ -529,9 +553,13 @@ function mapTrackingStatusToPhase(status: TrackingStatus, previousPhase: GamePha
     case 'calibrating':
       return GamePhase.Calibration;
     case 'tracking':
-      return GamePhase.Running;
+      return previousPhase === GamePhase.Running ||
+        previousPhase === GamePhase.Paused ||
+        previousPhase === GamePhase.GameOver
+        ? previousPhase
+        : GamePhase.CameraPermission;
     case 'lost':
-      return GamePhase.Paused;
+      return previousPhase;
     case 'denied':
       return previousPhase === GamePhase.Running ? GamePhase.Running : GamePhase.CameraPermission;
     case 'error':

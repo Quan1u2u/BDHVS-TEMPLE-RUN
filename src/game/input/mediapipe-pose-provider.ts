@@ -41,9 +41,7 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
           // Lower resolution to improve performance
           width: 960,
           height: 540,
-          facingMode: {
-            exact: 'user',
-          },
+          facingMode: 'user',
           aspectRatio: 16 / 9,
         },
         audio: false,

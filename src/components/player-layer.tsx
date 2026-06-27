@@ -16,7 +16,7 @@ interface PlayerLayerProps {
   visibleRows: number;
 }
 
-const hiddenPhases = new Set<GamePhase>([GamePhase.CameraPermission, GamePhase.GameOver]);
+const hiddenPhases = new Set<GamePhase>([GamePhase.Boot]);
 
 export function PlayerLayer({
   render,
