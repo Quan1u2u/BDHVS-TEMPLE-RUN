@@ -22,6 +22,8 @@ export interface CollectibleRender {
   type: CollectibleType;
 }
 
+export const tileSizeAtom = atom(0);
+export const visibleRowsAtom = atom(0);
 export const playerLaneAtom = atom(Lane.Center);
 export const boardScrollOffsetRowsAtom = atom(0);
 export const unitsPerBoardRowAtom = atom(72);

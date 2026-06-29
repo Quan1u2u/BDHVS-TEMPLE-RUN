@@ -1,6 +1,8 @@
 import { Box, Text, VStack } from '@chakra-ui/react';
 import { useAtomValue } from 'jotai';
+import { getDefaultStore } from 'jotai/vanilla';
 import { useEffect, useRef } from 'react';
+
 import type { PoseLandmark } from '@/game/domain/types';
 import {
   previewLandmarksAtom,
@@ -28,9 +30,6 @@ const POSE_CONNECTIONS: Array<[number, number]> = [
 
 export function WebcamPreviewPanel() {
   const stream = useAtomValue(previewStreamAtom);
-  const landmarks = useAtomValue(previewLandmarksAtom);
-  const videoWidth = useAtomValue(previewVideoWidthAtom);
-  const videoHeight = useAtomValue(previewVideoHeightAtom);
   const trackingStatus = useAtomValue(trackingStatusAtom);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -42,24 +41,44 @@ export function WebcamPreviewPanel() {
   }, [stream]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
+    let raf = 0;
+    let lastW = 0;
+    let lastH = 0;
+    let lastCtx: CanvasRenderingContext2D | null = null;
+
+    function frame() {
+      const c = canvasRef.current;
+      if (!c) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      const cx = lastCtx || c.getContext('2d', { willReadFrequently: false });
+      if (!cx) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      lastCtx = cx;
+
+      const store = getDefaultStore();
+      const landmarks = store.get(previewLandmarksAtom);
+      const w = store.get(previewVideoWidthAtom) || 320;
+      const h = store.get(previewVideoHeightAtom) || 180;
+
+      if (w !== lastW || h !== lastH) {
+        c.width = w;
+        c.height = h;
+        lastW = w;
+        lastH = h;
+      }
+
+      cx.clearRect(0, 0, w, h);
+      drawPoseOverlay(cx, landmarks, w, h);
+      raf = requestAnimationFrame(frame);
     }
 
-    const width = videoWidth || 320;
-    const height = videoHeight || 180;
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      return;
-    }
-
-    context.clearRect(0, 0, width, height);
-    drawPoseOverlay(context, landmarks, width, height);
-  }, [landmarks, videoHeight, videoWidth]);
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
     <VStack align="stretch" gap={2} boxSize="full" overflow="hidden" p={4}>
@@ -133,21 +152,21 @@ function drawPoseOverlay(
   for (const [from, to] of POSE_CONNECTIONS) {
     const start = landmarks[from];
     const end = landmarks[to];
-
-    if (!start || !end) {
-      continue;
-    }
-
+    if (!start || !end) continue;
     context.beginPath();
     context.moveTo(start.x * width, start.y * height);
     context.lineTo(end.x * width, end.y * height);
     context.stroke();
   }
 
+  context.fillStyle = '#f97316';
+  context.beginPath();
+  const r = 4;
   for (const landmark of landmarks) {
-    context.beginPath();
-    context.fillStyle = '#f97316';
-    context.arc(landmark.x * width, landmark.y * height, 4, 0, Math.PI * 2);
-    context.fill();
+    const lx = landmark.x * width;
+    const ly = landmark.y * height;
+    context.moveTo(lx + r, ly);
+    context.arc(lx, ly, r, 0, Math.PI * 2);
   }
+  context.fill();
 }

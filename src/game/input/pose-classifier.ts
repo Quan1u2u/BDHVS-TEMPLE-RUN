@@ -75,13 +75,10 @@ export function classifyPose(
     lastLeanDirection = null;
   }
 
-  return {
-    command,
-    nextState: {
-      baseNoseX: baseNoseX * 0.98 + nose.x * 0.02,
-      baseNoseY: baseNoseY * 0.98 + nose.y * 0.02,
-      emaTilt,
-      lastLeanDirection,
-    },
-  };
+  state.baseNoseX = baseNoseX * 0.98 + nose.x * 0.02;
+  state.baseNoseY = baseNoseY * 0.98 + nose.y * 0.02;
+  state.emaTilt = emaTilt;
+  state.lastLeanDirection = lastLeanDirection;
+
+  return { command, nextState: state };
 }

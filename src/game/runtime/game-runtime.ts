@@ -8,7 +8,7 @@ import {
   previewVideoHeightAtom,
   previewVideoWidthAtom,
 } from '@/store/atoms/preview-atoms';
-import { renderErrorAtom } from '@/store/atoms/render-atoms';
+import { renderErrorAtom, tileSizeAtom, visibleRowsAtom } from '@/store/atoms/render-atoms';
 import { getAppliedGameSettings } from '@/store/atoms/settings-atoms';
 import type { MetricsSink } from '../../store/atoms/sink';
 import { AssetPipeline } from '../assets/asset-pipeline';
@@ -22,6 +22,7 @@ import {
 import type { WorldRuntimeState } from '../domain/world';
 import { MediaPipePoseProvider } from '../input/mediapipe-pose-provider';
 import type { PoseCommandProvider, PoseProviderStatus } from '../input/pose-provider';
+import { computeTileSize, computeVisibleRows } from '../rendering/grid-layout';
 import { createInitialWorld } from './world-factory';
 import { stepWorld } from './world-simulation';
 
@@ -36,6 +37,7 @@ interface RuntimeContext {
   pendingAction: PlayerAction;
   bootStage: string;
   bootProgress: number;
+  resizeObserver: ResizeObserver | null;
 }
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Static runtime ownership is intentional to keep the hot path centralized and lightweight.
@@ -58,9 +60,20 @@ export class GameRuntime {
       pendingAction: PlayerAction.None,
       bootStage: 'shell',
       bootProgress: 0.05,
+      resizeObserver: null,
     };
 
     GameRuntime.context = context;
+    context.resizeObserver = new ResizeObserver(([entry]) => {
+      if (!entry || !GameRuntime.context) return;
+      const { width, height } = entry.contentRect;
+      const tileSize = computeTileSize(Math.round(width));
+      const visibleRows = computeVisibleRows(Math.round(height), tileSize);
+      getDefaultStore().set(tileSizeAtom, tileSize);
+      getDefaultStore().set(visibleRowsAtom, visibleRows);
+    });
+    context.resizeObserver.observe(context.host);
+
     context.world.phase = GamePhase.Boot;
     context.world.debugMessage = 'Preparing DOM shell';
     GameRuntime.publishMetrics();
@@ -133,6 +146,8 @@ export class GameRuntime {
 
     GameRuntime.sessionCounter += 1;
     cancelAnimationFrame(GameRuntime.context.frameHandle);
+    GameRuntime.context.resizeObserver?.disconnect();
+    GameRuntime.context.resizeObserver = null;
     GameRuntime.unbindKeyboard();
     await GameRuntime.context.poseProvider?.stop();
     soundEngine.stopBackgroundMusic();

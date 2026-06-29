@@ -21,7 +21,9 @@ import {
   obstaclesAtom,
   playerLaneAtom,
   renderErrorAtom,
+  tileSizeAtom,
   unitsPerBoardRowAtom,
+  visibleRowsAtom,
 } from '../store/atoms/render-atoms';
 import { BoardEntityLayer } from './board-entity-layer';
 import { BoardFloorLayer } from './board-floor-layer';
@@ -32,19 +34,18 @@ extensions.add(CullerPlugin);
 extend({ Container, Sprite });
 
 interface GameStageSceneProps {
-  height: number;
-  tileSize: number;
-  visibleRows: number;
-  width: number;
+  parentRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export function GameStageScene({ height, tileSize, visibleRows, width }: GameStageSceneProps) {
+export function GameStageScene({ parentRef }: GameStageSceneProps) {
   const [tileTexture, setTileTexture] = useState<Texture | null>(null);
 
   const phase = useAtomValue(phaseAtom);
   const playerLane = useAtomValue(playerLaneAtom);
   const boardScrollOffsetRows = useAtomValue(boardScrollOffsetRowsAtom);
   const unitsPerBoardRow = useAtomValue(unitsPerBoardRowAtom);
+  const tileSize = useAtomValue(tileSizeAtom);
+  const visibleRows = useAtomValue(visibleRowsAtom);
   const blockedRows = useAtomValue(blockedRowsAtom);
   const obstacles = useAtomValue(obstaclesAtom);
   const collectibles = useAtomValue(collectiblesAtom);
@@ -70,8 +71,7 @@ export function GameStageScene({ height, tileSize, visibleRows, width }: GameSta
 
   return (
     <Application
-      width={width}
-      height={height}
+      resizeTo={parentRef}
       background="black"
       antialias
       preference="webgpu"

@@ -19,6 +19,7 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
   private listeners: PoseProviderListeners | null = null;
   private classifierState = createInitialPoseClassifierState();
   private animationFrame = 0;
+  private landmarkPool: PoseLandmark[] = [];
 
   public async start(listeners: PoseProviderListeners): Promise<void> {
     await this.stop();
@@ -39,8 +40,8 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
           // Lower resolution to improve performance
-          width: 960,
-          height: 540,
+          width: 640,
+          height: 360,
           facingMode: 'user',
           aspectRatio: 16 / 9,
         },
@@ -186,12 +187,6 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
     const classification = classifyPose(landmarks, this.classifierState);
     this.classifierState = classification.nextState;
     this.listeners?.onCommand(classification.command);
-    const previewLandmarks = landmarks.map<PoseLandmark>((landmark) => ({
-      x: landmark.x,
-      y: landmark.y,
-      z: landmark.z,
-      visibility: landmark.visibility,
-    }));
     this.pushStatus({
       command: classification.command,
       trackingStatus: 'tracking',
@@ -199,10 +194,29 @@ export class MediaPipePoseProvider implements PoseCommandProvider {
       cameraEnabled: true,
       debugMessage: 'Pose tracking locked',
       stream: this.stream,
-      landmarks: previewLandmarks,
+      landmarks: this.fillLandmarkPool(landmarks),
       videoWidth: this.video.videoWidth,
       videoHeight: this.video.videoHeight,
     });
+  }
+
+  private fillLandmarkPool(
+    src: readonly { x: number; y: number; z?: number; visibility?: number }[],
+  ): PoseLandmark[] {
+    const len = src.length;
+    while (this.landmarkPool.length < len) {
+      this.landmarkPool.push({ x: 0, y: 0, z: 0, visibility: 0 });
+    }
+    for (let i = 0; i < len; i++) {
+      const s = src[i];
+      const d = this.landmarkPool[i];
+      if (!s || !d) continue;
+      d.x = s.x;
+      d.y = s.y;
+      d.z = s.z ?? 0;
+      d.visibility = s.visibility ?? 0;
+    }
+    return this.landmarkPool.slice(0, len);
   }
 
   private pushStatus(status: PoseProviderStatus): void {

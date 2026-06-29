@@ -31,7 +31,9 @@ export {
   obstaclesAtom,
   playerLaneAtom,
   renderErrorAtom,
+  tileSizeAtom,
   unitsPerBoardRowAtom,
+  visibleRowsAtom,
 } from './render-atoms';
 export {
   appliedSettingsAtom,
