@@ -1,4 +1,3 @@
-import { useAtomValue } from 'jotai';
 import type { Texture } from 'pixi.js';
 import { memo, useMemo } from 'react';
 
@@ -12,29 +11,27 @@ import {
 } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
-import { phaseAtom } from '../store/atoms/metrics-atoms';
-import {
-  blockedRowsAtom,
-  boardScrollOffsetRowsAtom,
-  tileSizeAtom,
-  unitsPerBoardRowAtom,
-  visibleRowsAtom,
-} from '../store/atoms/render-atoms';
+import type { BlockedRowRender } from '../store/atoms/render-atoms';
 
 interface BoardFloorLayerProps {
+  tileSize: number;
   tileTexture: Texture;
+  visibleRows: number;
+  phase: GamePhase;
+  boardScrollOffsetRows: number;
+  blockedRows: BlockedRowRender[];
+  unitsPerBoardRow: number;
 }
 
 export const BoardFloorLayer = memo(function BoardFloorLayer({
+  tileSize,
   tileTexture,
+  visibleRows,
+  phase,
+  boardScrollOffsetRows,
+  blockedRows,
+  unitsPerBoardRow,
 }: BoardFloorLayerProps) {
-  const phase = useAtomValue(phaseAtom);
-  const tileSize = useAtomValue(tileSizeAtom);
-  const visibleRows = useAtomValue(visibleRowsAtom);
-  const boardScrollOffsetRows = useAtomValue(boardScrollOffsetRowsAtom);
-  const blockedRows = useAtomValue(blockedRowsAtom);
-  const unitsPerBoardRow = useAtomValue(unitsPerBoardRowAtom);
-
   const sprites = useMemo(() => {
     if (phase === GamePhase.Boot) return [];
 

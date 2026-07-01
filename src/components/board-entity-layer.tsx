@@ -1,4 +1,3 @@
-import { useAtomValue } from 'jotai';
 import type { Texture } from 'pixi.js';
 import { memo, useMemo } from 'react';
 
@@ -6,29 +5,27 @@ import { CollectibleType, GamePhase, ObstacleType } from '../game/domain/types';
 import { laneToBoardColumn, trackOffsetToBoardY } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
-import { phaseAtom } from '../store/atoms/metrics-atoms';
-import {
-  collectiblesAtom,
-  obstaclesAtom,
-  tileSizeAtom,
-  unitsPerBoardRowAtom,
-  visibleRowsAtom,
-} from '../store/atoms/render-atoms';
+import type { CollectibleRender, ObstacleRender } from '../store/atoms/render-atoms';
 
 interface BoardEntityLayerProps {
+  tileSize: number;
   tileTexture: Texture;
+  visibleRows: number;
+  phase: GamePhase;
+  obstacles: ObstacleRender[];
+  collectibles: CollectibleRender[];
+  unitsPerBoardRow: number;
 }
 
 export const BoardEntityLayer = memo(function BoardEntityLayer({
+  tileSize,
   tileTexture,
+  visibleRows,
+  phase,
+  obstacles,
+  collectibles,
+  unitsPerBoardRow,
 }: BoardEntityLayerProps) {
-  const phase = useAtomValue(phaseAtom);
-  const tileSize = useAtomValue(tileSizeAtom);
-  const visibleRows = useAtomValue(visibleRowsAtom);
-  const obstacles = useAtomValue(obstaclesAtom);
-  const collectibles = useAtomValue(collectiblesAtom);
-  const unitsPerBoardRow = useAtomValue(unitsPerBoardRowAtom);
-
   const sprites = useMemo(() => {
     if (phase !== GamePhase.Running) return [];
 
