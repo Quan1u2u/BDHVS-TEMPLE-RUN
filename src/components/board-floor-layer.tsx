@@ -38,17 +38,17 @@ export function BoardFloorLayer({
     const { baseRow, rowOffset } = splitBoardScrollOffset(boardScrollOffsetRows);
 
     for (let row = -FLOOR_BUFFER_ROWS; row < visibleRows + FLOOR_BUFFER_ROWS; row += 1) {
-      const boardRow = baseRow + row;
+      const boardRow = baseRow - row;
       const rowTiles = buildBoardRowTiles(boardRow);
       for (let column = 0; column < BOARD_COLUMNS; column += 1) {
         const tileId = rowTiles[column];
         if (tileId === undefined) continue;
         nextSprites.push(
           <pixiSprite
-            key={`floor-${row}-${column}-${tileId}`}
+            key={`floor-${row}-${column}`}
             texture={createTileTextureOrThrow(tileTexture, tileId)}
             x={column * tileSize}
-            y={(row - rowOffset) * tileSize}
+            y={(row + rowOffset) * tileSize}
             width={tileSize}
             height={tileSize}
             cullable

@@ -40,8 +40,8 @@ export const defaultGameSettings: GameSettings = {
   passiveScorePerSecond: 12,
   obstacleCollisionWidthFactor: 0.5,
   collectibleCollisionRadius: 40,
-  backgroundMusicVolume: 0.24,
-  sfxVolume: 0.62,
+  backgroundMusicVolume: 0.15,
+  sfxVolume: 0.4,
 };
 
 export const WORLD_WIDTH = 960;

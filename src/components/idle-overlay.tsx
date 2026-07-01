@@ -1,4 +1,4 @@
-import { Box, Heading, HStack, Image, Text, VStack } from '@chakra-ui/react';
+import { Box, Grid, Heading, HStack, Image, Text, VStack } from '@chakra-ui/react';
 import { useAtomValue } from 'jotai';
 import { CollectibleType, GamePhase, ObstacleType } from '../game/domain/types';
 import {
@@ -91,19 +91,29 @@ function LegendSection({
       </Text>
       <HStack align="start" flexWrap="wrap" gap={2}>
         {items.map((item) => (
-          <VStack
+          <Grid
+            templateRows="1fr 1fr"
             key={`${variant}-${item.type}`}
             bg="black"
             borderRadius="md"
-            gap={2}
-            px={2}
-            py={1}
+            w={32}
+            aspectRatio={1}
+            overflowWrap="break-word"
+            p={2}
+            css={{
+              '& > *': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+              },
+            }}
           >
-            <LegendSprite tileId={legendTileId(item.type, variant)} />
-            <Text fontSize="sm" textAlign="center">
-              {item.label}
-            </Text>
-          </VStack>
+            <Box>
+              <LegendSprite tileId={legendTileId(item.type, variant)} />
+            </Box>
+            <Box fontSize="sm">{item.label}</Box>
+          </Grid>
         ))}
       </HStack>
     </VStack>

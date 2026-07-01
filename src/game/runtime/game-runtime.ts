@@ -392,7 +392,8 @@ export class GameRuntime {
     GameRuntime.context.metricsSink.publishRenderState({
       playerLane: Math.round(world.player.currentLane) as Lane,
       boardScrollOffsetRows:
-        (world.distance + world.idleScroll) / Math.max(1, world.settings.obstacleWidth),
+        (world.distance + world.idleScroll) /
+        (Math.max(0.001, world.settings.distanceScale) * Math.max(1, world.settings.obstacleWidth)),
       unitsPerBoardRow: world.settings.obstacleWidth,
       blockedRows: world.blockedRows.map((blockedRow) => ({
         id: blockedRow.id,

@@ -22,9 +22,10 @@ export class SoundEngine {
   private bgGain: GainNode | null = null;
   private bgIndex: number = 0;
   private pendingBgIndex: number | null = null;
-  private backgroundMusicVolume = 0.24;
-  private sfxVolume = 0.62;
+  private backgroundMusicVolume = 0.15;
+  private sfxVolume = 0.4;
   private isMusicPaused = false;
+  private activeSfxSource: AudioBufferSourceNode | null = null;
 
   private getContext(): AudioContext {
     if (!this.ctx) {
@@ -85,16 +86,25 @@ export class SoundEngine {
     const buffer = this.buffers.get(key);
     if (!buffer) return;
 
+    this.activeSfxSource?.stop();
+    this.activeSfxSource = null;
+
     this.ctx?.resume();
     const ctx = this.getContext();
     const source = ctx.createBufferSource();
     source.buffer = buffer;
+    source.onended = () => {
+      if (this.activeSfxSource === source) {
+        this.activeSfxSource = null;
+      }
+    };
 
     const gain = ctx.createGain();
     gain.gain.value = this.sfxVolume;
 
     source.connect(gain).connect(ctx.destination);
     source.start();
+    this.activeSfxSource = source;
   }
 
   playSfx(index?: number): void {
