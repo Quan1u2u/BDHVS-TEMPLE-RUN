@@ -1,5 +1,7 @@
+import { useAtomValue } from 'jotai';
 import type { Texture } from 'pixi.js';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
+
 import { GamePhase } from '../game/domain/types';
 import { buildBoardRowTiles } from '../game/rendering/board-tiles';
 import {
@@ -10,27 +12,29 @@ import {
 } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
-import type { BlockedRowRender } from '../store/atoms/render-atoms';
+import { phaseAtom } from '../store/atoms/metrics-atoms';
+import {
+  blockedRowsAtom,
+  boardScrollOffsetRowsAtom,
+  tileSizeAtom,
+  unitsPerBoardRowAtom,
+  visibleRowsAtom,
+} from '../store/atoms/render-atoms';
 
 interface BoardFloorLayerProps {
-  tileSize: number;
   tileTexture: Texture;
-  visibleRows: number;
-  phase: GamePhase;
-  boardScrollOffsetRows: number;
-  blockedRows: BlockedRowRender[];
-  unitsPerBoardRow: number;
 }
 
-export function BoardFloorLayer({
-  tileSize,
+export const BoardFloorLayer = memo(function BoardFloorLayer({
   tileTexture,
-  visibleRows,
-  phase,
-  boardScrollOffsetRows,
-  blockedRows,
-  unitsPerBoardRow,
 }: BoardFloorLayerProps) {
+  const phase = useAtomValue(phaseAtom);
+  const tileSize = useAtomValue(tileSizeAtom);
+  const visibleRows = useAtomValue(visibleRowsAtom);
+  const boardScrollOffsetRows = useAtomValue(boardScrollOffsetRowsAtom);
+  const blockedRows = useAtomValue(blockedRowsAtom);
+  const unitsPerBoardRow = useAtomValue(unitsPerBoardRowAtom);
+
   const sprites = useMemo(() => {
     if (phase === GamePhase.Boot) return [];
 
@@ -51,7 +55,6 @@ export function BoardFloorLayer({
             y={(row + rowOffset) * tileSize}
             width={tileSize}
             height={tileSize}
-            cullable
           />,
         );
       }
@@ -68,7 +71,6 @@ export function BoardFloorLayer({
             y={y * tileSize}
             width={tileSize}
             height={tileSize}
-            cullable
           />,
         );
       }
@@ -85,5 +87,5 @@ export function BoardFloorLayer({
     visibleRows,
   ]);
 
-  return <pixiContainer cullableChildren>{sprites}</pixiContainer>;
-}
+  return <pixiContainer>{sprites}</pixiContainer>;
+});

@@ -1,29 +1,27 @@
 import { useTick } from '@pixi/react';
+import { useAtomValue } from 'jotai';
 import type { Sprite, Texture } from 'pixi.js';
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 
-import { GamePhase, type Lane } from '../game/domain/types';
+import { GamePhase } from '../game/domain/types';
 import { laneToBoardColumn, VERTICAL_PLAYER_ROW_OFFSET } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
+import { phaseAtom } from '../store/atoms/metrics-atoms';
+import { playerLaneAtom, tileSizeAtom, visibleRowsAtom } from '../store/atoms/render-atoms';
 
 interface PlayerLayerProps {
-  tileSize: number;
   tileTexture: Texture | null;
-  visibleRows: number;
-  phase: GamePhase;
-  playerLane: Lane;
 }
 
 const hiddenPhases = new Set<GamePhase>([GamePhase.Boot]);
 
-export function PlayerLayer({
-  tileSize,
-  tileTexture,
-  visibleRows,
-  phase,
-  playerLane,
-}: PlayerLayerProps) {
+export const PlayerLayer = memo(function PlayerLayer({ tileTexture }: PlayerLayerProps) {
+  const phase = useAtomValue(phaseAtom);
+  const tileSize = useAtomValue(tileSizeAtom);
+  const visibleRows = useAtomValue(visibleRowsAtom);
+  const playerLane = useAtomValue(playerLaneAtom);
+
   const column = laneToBoardColumn(playerLane);
   const playerRow = Math.max(0, visibleRows - VERTICAL_PLAYER_ROW_OFFSET);
   const texture = tileTexture ? createTileTextureOrThrow(tileTexture, TileId.MAIN_NPC) : null;
@@ -47,4 +45,4 @@ export function PlayerLayer({
       height={tileSize * 1.2}
     />
   );
-}
+});

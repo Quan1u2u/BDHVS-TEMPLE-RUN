@@ -89,6 +89,44 @@ function cloneMetricsSnapshot(snapshot: GameMetricsSnapshot): GameMetricsSnapsho
   return { ...snapshot };
 }
 
+function blockedRowEqual(
+  a: { id: string; trackOffset: number; blockedColumns: number[] },
+  b: { id: string; trackOffset: number; blockedColumns: number[] },
+): boolean {
+  if (a.id !== b.id || a.trackOffset !== b.trackOffset) return false;
+  if (a.blockedColumns.length !== b.blockedColumns.length) return false;
+  for (let i = 0; i < a.blockedColumns.length; i++) {
+    if (a.blockedColumns[i] !== b.blockedColumns[i]) return false;
+  }
+  return true;
+}
+
+function obstacleEqual(
+  a: { id: string; lane: Lane; trackOffset: number; type: ObstacleType },
+  b: { id: string; lane: Lane; trackOffset: number; type: ObstacleType },
+): boolean {
+  return a.id === b.id && a.lane === b.lane && a.trackOffset === b.trackOffset && a.type === b.type;
+}
+
+function collectibleEqual(
+  a: { id: string; lane: Lane; trackOffset: number; type: CollectibleType },
+  b: { id: string; lane: Lane; trackOffset: number; type: CollectibleType },
+): boolean {
+  return a.id === b.id && a.lane === b.lane && a.trackOffset === b.trackOffset && a.type === b.type;
+}
+
+function arraysEqual<T>(a: T[], b: T[] | null, compare: (a: T, b: T) => boolean): boolean {
+  if (b === null) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const ai = a[i];
+    const bi = b[i];
+    if (!ai || !bi) return false;
+    if (!compare(ai, bi)) return false;
+  }
+  return true;
+}
+
 export function createMetricsSink(): MetricsSink {
   const store = getDefaultStore();
   const metricTargets: Partial<{
@@ -96,13 +134,23 @@ export function createMetricsSink(): MetricsSink {
   }> = {};
   const renderSnapshotListeners = new Set<(snapshot: GameRenderSnapshot) => void>();
   const uiEventListeners = new Set<(event: RuntimeUiEvent) => void>();
-  const mirroredMetricKeys = new Set<keyof GameMetricsSnapshot>();
-  const mirroredMetricValues = new Map<keyof GameMetricsSnapshot, unknown>();
+  const mirroredMetricValues = {} as Partial<Record<keyof GameMetricsSnapshot, unknown>>;
   let previousMetricsSnapshot: GameMetricsSnapshot | null = null;
   let previousRenderError: string | null = null;
-  let lastBlockedRowsJson = '';
-  let lastObstaclesJson = '';
-  let lastCollectiblesJson = '';
+  let lastBlockedRows: Array<{ id: string; trackOffset: number; blockedColumns: number[] }> | null =
+    null;
+  let lastObstacles: Array<{
+    id: string;
+    lane: Lane;
+    trackOffset: number;
+    type: ObstacleType;
+  }> | null = null;
+  let lastCollectibles: Array<{
+    id: string;
+    lane: Lane;
+    trackOffset: number;
+    type: CollectibleType;
+  }> | null = null;
 
   function registerListener<T>(listeners: Set<T>, listener: T): () => void {
     listeners.add(listener);
@@ -153,9 +201,11 @@ export function createMetricsSink(): MetricsSink {
     write: (value: GameMetricsSnapshot[Key]) => void,
   ): void {
     const projectedValue = project(value);
-    if (!mirroredMetricKeys.has(key) || !Object.is(mirroredMetricValues.get(key), projectedValue)) {
-      mirroredMetricKeys.add(key);
-      mirroredMetricValues.set(key, projectedValue);
+    if (
+      !Object.hasOwn(mirroredMetricValues, key) ||
+      !Object.is(mirroredMetricValues[key], projectedValue)
+    ) {
+      mirroredMetricValues[key] = projectedValue;
       write(value);
     }
   }
@@ -280,21 +330,18 @@ export function createMetricsSink(): MetricsSink {
       store.set(boardScrollOffsetRowsAtom, snapshot.boardScrollOffsetRows);
       store.set(unitsPerBoardRowAtom, snapshot.unitsPerBoardRow);
 
-      const blockedJson = JSON.stringify(snapshot.blockedRows);
-      if (blockedJson !== lastBlockedRowsJson) {
-        lastBlockedRowsJson = blockedJson;
+      if (!arraysEqual(snapshot.blockedRows, lastBlockedRows, blockedRowEqual)) {
+        lastBlockedRows = snapshot.blockedRows;
         store.set(blockedRowsAtom, snapshot.blockedRows);
       }
 
-      const obsJson = JSON.stringify(snapshot.obstacles);
-      if (obsJson !== lastObstaclesJson) {
-        lastObstaclesJson = obsJson;
+      if (!arraysEqual(snapshot.obstacles, lastObstacles, obstacleEqual)) {
+        lastObstacles = snapshot.obstacles;
         store.set(obstaclesAtom, snapshot.obstacles);
       }
 
-      const colJson = JSON.stringify(snapshot.collectibles);
-      if (colJson !== lastCollectiblesJson) {
-        lastCollectiblesJson = colJson;
+      if (!arraysEqual(snapshot.collectibles, lastCollectibles, collectibleEqual)) {
+        lastCollectibles = snapshot.collectibles;
         store.set(collectiblesAtom, snapshot.collectibles);
       }
 

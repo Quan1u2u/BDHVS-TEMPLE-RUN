@@ -2,7 +2,7 @@ import { Rectangle, Texture } from 'pixi.js';
 
 import { getTileFrame, type TileId } from '../tiles/tile-atlas';
 
-const tileTextureCache = new Map<string, Texture>();
+let tileTextureCache: Record<string, Texture> = {};
 
 export function getTileTextureKey(tileId: TileId): string {
   return `tile-${Number(tileId)}`;
@@ -20,7 +20,7 @@ export function resolveTileFrameOrThrow(tileId: TileId) {
 
 export function createTileTextureOrThrow(tileTexture: Texture, tileId: TileId): Texture {
   const cacheKey = getTileTextureKey(tileId);
-  const cached = tileTextureCache.get(cacheKey);
+  const cached = tileTextureCache[cacheKey];
   if (cached) {
     return cached;
   }
@@ -30,10 +30,10 @@ export function createTileTextureOrThrow(tileTexture: Texture, tileId: TileId): 
     source: tileTexture.source,
     frame: new Rectangle(frame.x, frame.y, frame.width, frame.height),
   });
-  tileTextureCache.set(cacheKey, texture);
+  tileTextureCache[cacheKey] = texture;
   return texture;
 }
 
 export function clearTileTextureCache(): void {
-  tileTextureCache.clear();
+  tileTextureCache = {};
 }

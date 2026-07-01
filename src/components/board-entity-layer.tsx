@@ -1,30 +1,34 @@
+import { useAtomValue } from 'jotai';
 import type { Texture } from 'pixi.js';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
+
 import { CollectibleType, GamePhase, ObstacleType } from '../game/domain/types';
 import { laneToBoardColumn, trackOffsetToBoardY } from '../game/rendering/grid-layout';
 import { createTileTextureOrThrow } from '../game/rendering/tile-textures';
 import { TileId } from '../game/tiles/tile-atlas';
-import type { CollectibleRender, ObstacleRender } from '../store/atoms/render-atoms';
+import { phaseAtom } from '../store/atoms/metrics-atoms';
+import {
+  collectiblesAtom,
+  obstaclesAtom,
+  tileSizeAtom,
+  unitsPerBoardRowAtom,
+  visibleRowsAtom,
+} from '../store/atoms/render-atoms';
 
 interface BoardEntityLayerProps {
-  tileSize: number;
   tileTexture: Texture;
-  visibleRows: number;
-  phase: GamePhase;
-  obstacles: ObstacleRender[];
-  collectibles: CollectibleRender[];
-  unitsPerBoardRow: number;
 }
 
-export function BoardEntityLayer({
-  tileSize,
+export const BoardEntityLayer = memo(function BoardEntityLayer({
   tileTexture,
-  visibleRows,
-  phase,
-  obstacles,
-  collectibles,
-  unitsPerBoardRow,
 }: BoardEntityLayerProps) {
+  const phase = useAtomValue(phaseAtom);
+  const tileSize = useAtomValue(tileSizeAtom);
+  const visibleRows = useAtomValue(visibleRowsAtom);
+  const obstacles = useAtomValue(obstaclesAtom);
+  const collectibles = useAtomValue(collectiblesAtom);
+  const unitsPerBoardRow = useAtomValue(unitsPerBoardRowAtom);
+
   const sprites = useMemo(() => {
     if (phase !== GamePhase.Running) return [];
 
@@ -41,7 +45,6 @@ export function BoardEntityLayer({
           y={row * tileSize}
           width={tileSize}
           height={tileSize}
-          cullable
         />,
       );
     }
@@ -57,7 +60,6 @@ export function BoardEntityLayer({
           y={row * tileSize}
           width={tileSize}
           height={tileSize}
-          cullable
         />,
       );
     }
@@ -65,8 +67,8 @@ export function BoardEntityLayer({
     return nextSprites;
   }, [phase, obstacles, collectibles, unitsPerBoardRow, tileSize, tileTexture, visibleRows]);
 
-  return <pixiContainer cullableChildren>{sprites}</pixiContainer>;
-}
+  return <pixiContainer>{sprites}</pixiContainer>;
+});
 
 function obstacleTileId(obstacleType: ObstacleType): TileId {
   switch (obstacleType) {

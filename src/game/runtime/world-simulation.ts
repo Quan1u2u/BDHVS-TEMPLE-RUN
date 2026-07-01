@@ -422,7 +422,12 @@ function createBlockedRow(
   speedFactor: number,
 ): BlockedRowState {
   const openLane = laneOrder[Math.floor(seed / 500) % laneOrder.length] ?? Lane.Center;
-  const blockedColumns = laneOrder.filter((lane) => lane !== openLane).map((lane) => lane + 1);
+  const blockedColumns: number[] = [];
+  for (const lane of laneOrder) {
+    if (lane !== openLane) {
+      blockedColumns.push(lane + 1);
+    }
+  }
 
   if (speedFactor < 1.8) {
     blockedColumns.splice(1);
